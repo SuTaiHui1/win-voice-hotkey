@@ -1,10 +1,10 @@
 [CmdletBinding()]
-param([switch]$AllowLicensePending)
+param()
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 & (Join-Path $PSScriptRoot 'Get-Dependencies.ps1')
-if (!(Test-Path -LiteralPath (Join-Path $root 'LICENSE')) -and !$AllowLicensePending) {
-    throw 'Project license decision is pending; public release builds are blocked.'
+if (!(Test-Path -LiteralPath (Join-Path $root 'LICENSE'))) {
+    throw 'Project LICENSE is missing; public release builds are blocked.'
 }
 $out = Join-Path $root 'out'
 if (Test-Path -LiteralPath $out) { throw 'out already exists. Keep earlier artifacts or remove that exact generated directory before rebuilding.' }
@@ -30,12 +30,12 @@ try {
 $lock = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'dependencies.lock.json') | ConvertFrom-Json
 if ((Get-FileHash (Join-Path $app 'dependencies\AutoHotkey64.exe') -Algorithm SHA256).Hash -ne $lock.autohotkey.exeSha256) { throw 'Unexpected runtime binary.' }
 Copy-Item -LiteralPath (Join-Path $root '.cache\AutoHotkey-v2.0.30-source.zip') -Destination (Join-Path $package 'third-party-sources')
-foreach ($file in 'README.md','CHANGELOG.md','THIRD_PARTY_NOTICES.md','LICENSE','LICENSE-PENDING.txt') {
+foreach ($file in 'README.md','CHANGELOG.md','THIRD_PARTY_NOTICES.md','LICENSE') {
     if (Test-Path -LiteralPath (Join-Path $root $file)) { Copy-Item -LiteralPath (Join-Path $root $file) -Destination $package }
 }
 Copy-Item -Recurse -LiteralPath (Join-Path $root 'docs') -Destination $package
 New-Item -ItemType File -Path (Join-Path $package 'portable.flag') | Out-Null
-$version = if ($AllowLicensePending) { '0.1.0-draft' } else { '0.1.0' }
+$version = '0.1.0'
 $portable = Join-Path $out "win-voice-hotkey-$version-windows-x64-portable.zip"
 [IO.Compression.ZipFile]::CreateFromDirectory($package,$portable,[IO.Compression.CompressionLevel]::Optimal,$false)
 $installer = Join-Path $out "win-voice-hotkey-$version-windows-x64-setup.exe"

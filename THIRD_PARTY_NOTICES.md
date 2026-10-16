@@ -19,4 +19,4 @@ The earlier development workspace contains Descolada/UIA-v2 under MIT. The curre
 
 ## Project-specific source
 
-The application's AHK/C# code originated as a local Win+H prototype. No project license or application-specific copyright header was present in the supplied files. The owner must approve a license before public publication. See `LICENSE-PENDING.txt` until a real `LICENSE` replaces it.
+The application's AHK/C# code originated as a local Win+H prototype. No project license or application-specific copyright header was present in the supplied files. On 2026-10-16 the project owner explicitly approved MIT for project-specific code, while retaining AutoHotkey's GPL and corresponding source. See `LICENSE`. That MIT license does not replace any upstream license or notice.

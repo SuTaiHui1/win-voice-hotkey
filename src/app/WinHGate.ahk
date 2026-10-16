@@ -102,7 +102,7 @@ WriteMappingStatus(running) {
     IniWrite(running ? 1 : 0, stateFile, "State", "Running")
     IniWrite(DllCall("GetCurrentProcessId", "UInt"), stateFile, "State", "PID")
     IniWrite(TriggerKey, stateFile, "State", "Key")
-    IniWrite("0.1.0", stateFile, "State", "Version")
+    IniWrite("0.1.1", stateFile, "State", "Version")
     IniWrite(A_ScriptHwnd, stateFile, "State", "HWND")
     IniWrite(StatusToken, stateFile, "State", "InstanceToken")
     IniWrite(PhysicalTest ? "physical_diagnostic_no_voice" : HookTest ? "synthetic_diagnostic_no_voice" : "global_voice_mapping", stateFile, "State", "Mode")

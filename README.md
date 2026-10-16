@@ -4,7 +4,7 @@
 
 默认按鼠标后退侧键打开 Win+H，按前进侧键直接关闭语音面板。正在录音时也可以关闭，无需先点麦克风。中文托盘与设置界面，支持分别录制打开键和关闭键。
 
-版本：`0.1.0`。工具代码采用 MIT；随包运行时保留其原有 GPL v2 许可。
+版本：`0.1.1`。工具代码采用 MIT；随包运行时保留其原有 GPL v2 许可。
 
 ## 安装与开始使用
 
@@ -12,9 +12,9 @@
 
 | 文件 | 用途 |
 | --- | --- |
-| `win-voice-hotkey-0.1.0-windows-x64-setup.exe` | 按用户安装，添加开始菜单入口，不需要管理员权限 |
-| `win-voice-hotkey-0.1.0-windows-x64-portable.zip` | 解压到可写目录，双击 `WinVoiceHotkey.exe` 使用 |
-| `win-voice-hotkey-0.1.0-source.zip` | 工具源码、构建与测试脚本 |
+| `win-voice-hotkey-0.1.1-windows-x64-setup.exe` | 按用户安装，添加开始菜单入口，不需要管理员权限 |
+| `win-voice-hotkey-0.1.1-windows-x64-portable.zip` | 解压到可写目录，双击 `WinVoiceHotkey.exe` 使用 |
+| `win-voice-hotkey-0.1.1-source.zip` | 工具源码、构建与测试脚本 |
 | `SHA256SUMS.txt` | 以上文件的 SHA-256 校验值 |
 
 安装包和便携包已包含固定版本的 AutoHotkey；使用时不用安装 Python、AutoHotkey、Visual Studio 或其他开发环境。需要 Windows 自带的 .NET Framework 4.x。
@@ -32,7 +32,7 @@
 使用 PowerShell 校验文件：
 
 ```powershell
-Get-FileHash .\win-voice-hotkey-0.1.0-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\win-voice-hotkey-0.1.1-windows-x64-setup.exe -Algorithm SHA256
 ```
 
 ## 按键行为
@@ -139,7 +139,7 @@ Windows 语音输入使用 Microsoft 的在线语音识别服务，因此需要�
 
 输出位于 `out`。请先保留旧产物，再删除自己确认过的生成目录后重新构建。不要为了运行构建脚本降低系统执行策略；受管理设备可使用获准的开发环境或 GitHub Actions。[构建细节](docs/BUILDING.md)
 
-仓库提供 Windows CI 构建与不触发语音的逻辑回归；推送 `v0.1.0` 等标签后可生成 GitHub Release。CI 的 GUI/实际系统语音未作为跨系统验收。新仓库正式运行前不提供虚构的绿色构建徽章。
+仓库提供 Windows CI 构建与不触发语音的逻辑回归；推送 `v0.1.1` 等标签后可生成 GitHub Release。CI 的 GUI/实际系统语音未作为跨系统验收。新仓库正式运行前不提供虚构的绿色构建徽章。
 
 欢迎阅读 [贡献指南](CONTRIBUTING.md)、[安全报告](SECURITY.md)、[变更记录](CHANGELOG.md)。
 

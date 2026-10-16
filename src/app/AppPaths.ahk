@@ -42,8 +42,13 @@ AppSettingsRequest(*) {
     OpenKeySettings()
 }
 RunSmokeTest(*) {
-    global DataDir, TriggerKey, CloseKey, ConfigPath, StartupLink, SettingsOpen, SettingsWindow
+    global DataDir, TriggerKey, CloseKey, ConfigPath, StartupLink, SettingsOpen, SettingsWindow, CloseBrokerReady
     try {
+        deadline := A_TickCount + 4000
+        while !CloseBrokerReady && A_TickCount < deadline
+            Sleep(25)
+        if !CloseBrokerReady
+            throw Error("close broker did not become ready")
         OpenKeySettings()
         if !SettingsOpen || !IsObject(SettingsWindow)
             throw Error("settings did not open")
@@ -56,7 +61,7 @@ RunSmokeTest(*) {
             throw Error("isolated startup shortcut not removed")
         if IniRead(ConfigPath, "Mapping", "Key") != TriggerKey || IniRead(ConfigPath, "Mapping", "CloseKey") != CloseKey
             throw Error("configuration changed")
-        FileAppend('{"settings_opened":true,"settings_closed":true,"startup_roundtrip":true,"hooks_installed":false,"microphone_used":false}', DataDir "\smoke-results.json", "UTF-8-RAW")
+        FileAppend('{"settings_opened":true,"settings_closed":true,"startup_roundtrip":true,"broker_ready":true,"hooks_installed":false,"microphone_used":false}', DataDir "\smoke-results.json", "UTF-8-RAW")
         ExitApp()
     } catch as problem {
         FileAppend(problem.Message, DataDir "\smoke-error.txt", "UTF-8-RAW")

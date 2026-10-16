@@ -36,6 +36,7 @@
       "settings_opened": true,
       "settings_closed": true,
       "startup_roundtrip": true,
+      "broker_ready": true,
       "hooks_installed": false,
       "microphone_used": false
     },
@@ -43,13 +44,13 @@
   },
   {
     "result": {
-      "unrelatedFilePreserved": true,
-      "configPreserved": true,
-      "settings": true,
       "realStartupModified": false,
       "exit": true,
+      "unrelatedFilePreserved": true,
+      "uninstall": true,
+      "configPreserved": true,
       "install": true,
-      "uninstall": true
+      "settings": true
     },
     "name": "installer"
   }

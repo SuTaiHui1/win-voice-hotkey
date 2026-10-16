@@ -6,13 +6,17 @@ $package = Join-Path $root 'out\package'
 if (!(Test-Path -LiteralPath $package)) { throw 'Build first.' }
 $testRoot = Join-Path $root ('out\tests-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $testRoot | Out-Null
+$testHost = Join-Path $testRoot 'TestDesktop.exe'
+$csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+& $csc /nologo /target:exe /platform:x64 ('/out:'+$testHost) (Join-Path $root 'src\host\TestDesktop.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Test desktop host compilation failed.' }
 $results = @()
 foreach ($name in 'GlobalMappingUnitCheck','MouseMappingUnitCheck','CloseBindingsUnitCheck') {
     $folder = Join-Path $testRoot $name
     New-Item -ItemType Directory -Path $folder | Out-Null
     Copy-Item -Path (Join-Path $root 'src\app\*.ahk') -Destination $folder
     Copy-Item -LiteralPath (Join-Path $root "tests\$name.ahk") -Destination $folder
-    $process = Start-Process -FilePath (Join-Path $package 'app\dependencies\AutoHotkey64.exe') -ArgumentList @('/ErrorStdOut',('"'+(Join-Path $folder "$name.ahk")+'"')) -WindowStyle Hidden -PassThru -RedirectStandardError (Join-Path $folder 'stderr.txt') -RedirectStandardOutput (Join-Path $folder 'stdout.txt')
+    $process = Start-Process -FilePath $testHost -ArgumentList @(('"'+(Join-Path $package 'app\dependencies\AutoHotkey64.exe')+'"'),('"'+(Join-Path $folder "$name.ahk")+'"')) -WindowStyle Hidden -PassThru -RedirectStandardError (Join-Path $folder 'stderr.txt') -RedirectStandardOutput (Join-Path $folder 'stdout.txt')
     if (!$process.WaitForExit(15000)) { $process.Kill(); throw "$name timed out." }
     if ($process.ExitCode -ne 0) { throw "$name failed. See $folder" }
     $result = Get-ChildItem -LiteralPath $folder -Filter '*unit-results.json' | Select-Object -First 1

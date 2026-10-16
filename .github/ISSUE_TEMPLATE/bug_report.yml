@@ -1,0 +1,16 @@
+name: 问题报告
+description: 报告可复现的问题（不要附带录音或个人运行数据）
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 工具版本与 Windows 构建号
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤、预期与实际结果
+      description: 包含鼠标/键盘型号、绑定键、托盘状态和原生 Win+H 是否正常；去除个人路径和聊天内容。
+    validations:
+      required: true

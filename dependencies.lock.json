@@ -1,0 +1,10 @@
+{
+  "autohotkey": {
+    "version": "2.0.30",
+    "runtimeUrl": "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.30/AutoHotkey_2.0.30.zip",
+    "runtimeSha256": "1e0ece7ecb2d5646e55758150472677996a57f9db5c83d2996d8b47b9e2f31a4",
+    "exeSha256": "2eab99848ebc07f8ab0cc448bf69af8c700b2fc7fcd1ff8794df743dcc58da51",
+    "sourceUrl": "https://github.com/AutoHotkey/AutoHotkey/archive/refs/tags/v2.0.30.zip",
+    "sourceSha256": "685fcb71b65fc4f5983f9251f367781957bd1aa201209ef626a9e3e4b2a9f30a"
+  }
+}

@@ -1,0 +1,56 @@
+[
+  {
+    "result": {
+      "passed": 142,
+      "voice_dispatch_counter": 12,
+      "actual_send_calls": 0,
+      "hooks_installed": false,
+      "microphone_used": false
+    },
+    "name": "GlobalMappingUnitCheck"
+  },
+  {
+    "result": {
+      "passed": 156,
+      "dispatch_counter": 42,
+      "real_WinH_sent": false,
+      "microphone_used": false,
+      "user_config_modified": false,
+      "native_hook_install_uninstall": "isolated_test_desktop"
+    },
+    "name": "MouseMappingUnitCheck"
+  },
+  {
+    "result": {
+      "passed": 132,
+      "open_counter": 3,
+      "close_counter": 4,
+      "real_voice_sent": false,
+      "real_panel_closed": false,
+      "user_config_modified": false
+    },
+    "name": "CloseBindingsUnitCheck"
+  },
+  {
+    "result": {
+      "settings_opened": true,
+      "settings_closed": true,
+      "startup_roundtrip": true,
+      "hooks_installed": false,
+      "microphone_used": false
+    },
+    "name": "portable-smoke"
+  },
+  {
+    "result": {
+      "unrelatedFilePreserved": true,
+      "configPreserved": true,
+      "settings": true,
+      "realStartupModified": false,
+      "exit": true,
+      "install": true,
+      "uninstall": true
+    },
+    "name": "installer"
+  }
+]

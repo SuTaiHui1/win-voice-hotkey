@@ -1,0 +1,9 @@
+name: 功能建议
+description: 描述具体使用场景
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: 使用场景与希望改善的行为
+    validations:
+      required: true

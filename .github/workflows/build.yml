@@ -1,0 +1,56 @@
+name: Build and release
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check public content
+        shell: pwsh
+        run: ./scripts/Check-PublicContent.ps1
+      - name: Build unsigned packages
+        shell: pwsh
+        run: ./scripts/Build.ps1
+      - name: Run logic regression without voice or input hooks
+        shell: pwsh
+        run: ./scripts/Test.ps1 -UnitOnly
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: |
+            out/*-portable.zip
+            out/*-setup.exe
+            out/*-source.zip
+            out/SHA256SUMS.txt
+            out/tests-*/results.json
+  release:
+    if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push'
+    needs: build
+    permissions:
+      contents: write
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x64
+          path: artifacts
+      - name: Publish new release without replacing existing content
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.ref_name }}'
+          if ($tag -ne 'v0.1.0') { throw 'Update the package version and release notes before publishing a different tag.' }
+          gh release view $tag --repo '${{ github.repository }}' *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'Release already exists; nothing will be overwritten.' }
+          $assets = Get-ChildItem artifacts -File | Where-Object Name -Match '(-portable\.zip|-setup\.exe|-source\.zip|SHA256SUMS\.txt)$'
+          gh release create $tag --repo '${{ github.repository }}' --verify-tag --title 'v0.1.0 · Windows 语音输入快捷键工具' --notes-file docs/RELEASE_NOTES.md @($assets.FullName)
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }

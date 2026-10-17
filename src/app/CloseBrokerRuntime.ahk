@@ -1,5 +1,7 @@
 ﻿#Include PanelWindowTracker.ahk
 global CloseActionSink := 0, CloseAcceptanceLog := ""
+global BrokerRequestSink := 0
+global PendingBrokerGeneration := 0
 global CloseLastResult := "not_requested", CloseLastRequested := "", CloseLatencyMs := 0
 global CloseBrokerHandle := 0, CloseBrokerPID := 0, CloseBrokerHWND := 0
 global CloseBrokerToken := 0, CloseBrokerReady := false, CloseBrokerReadyPath := "", CloseBrokerStarted := 0
@@ -65,18 +67,30 @@ PollCloseBrokerReady(*) {
         SetTimer(PollCloseBrokerReady, 0)
     }
 }
-StartCloseWorker() {
+StartCloseWorker(mode := "close") {
     global CloseBusy, CloseBrokerReady, CloseBrokerHWND, CloseBrokerToken
     global CloseRequestSeq, CloseStartedTick, CloseLastRequested, CloseLastResult
+    global BrokerRequestSink, PendingBrokerAction, PanelCandidateOverflow, PendingBrokerGeneration, InputState
+    if mode != "close" && mode != "toggle" && mode != "presence"
+        return false
+    if IsObject(BrokerRequestSink) {
+        BrokerRequestSink.Call(mode)
+        return true
+    }
     if CloseBusy
-        return
+        return false
     if !CloseBrokerReady {
         CloseLastResult := "helper_not_ready"
         try WriteCloseStatus()
-        return
+        return false
     }
+    if !RefreshPanelCandidates() || PanelCandidateOverflow {
+        CloseLastResult := "candidate_scan_incomplete"
+        return false
+    }
+    SupportLog("panel_request", "mode=" mode " candidates=" PanelCandidates.Count)
     CloseRequestSeq += 1
-    json := '{"Seq":' CloseRequestSeq ',"Candidates":' PanelCandidateJSON() '}'
+    json := '{"Seq":' CloseRequestSeq ',"Action":"' mode '","Candidates":' PanelCandidateJSON() '}'
     bytes := Buffer(StrPut(json, "UTF-8"), 0)
     StrPut(json, bytes, "UTF-8")
     packet := Buffer(A_PtrSize * 3, 0)
@@ -84,6 +98,8 @@ StartCloseWorker() {
     NumPut("UInt", bytes.Size, packet, A_PtrSize)
     NumPut("Ptr", bytes.Ptr, packet, A_PtrSize * 2)
     CloseBusy := true, CloseStartedTick := A_TickCount
+    PendingBrokerAction := mode
+    PendingBrokerGeneration := InputState.Generation
     CloseLastRequested := A_NowUTC, CloseLastResult := "pending"
     result := 0
     okay := DllCall("SendMessageTimeoutW", "Ptr", CloseBrokerHWND, "UInt", 0x4A,
@@ -92,15 +108,17 @@ StartCloseWorker() {
         CloseBusy := false
         CloseLastResult := result = 2 ? "helper_busy" : "helper_not_ready"
         try WriteCloseStatus()
+        return false
     }
+    return true
 }
 CloseBrokerResult(packed, token, *) {
     global DataDir
     global CloseBrokerToken, CloseRequestSeq, CloseBusy, CloseLastResult, CloseStartedTick
-    global CloseLatencyMs, CloseAcceptanceLog
+    global CloseLatencyMs, CloseAcceptanceLog, PendingBrokerAction, PendingBrokerGeneration, InputState, ActionState
     if token != CloseBrokerToken || (packed >> 8) != CloseRequestSeq
         return
-    codes := Map(1, "closed", 2, "no_verified_panel", 3, "ambiguous_panel", 4, "close_not_confirmed", 5, "rejected", 6, "helper_timeout_no_other_action")
+    codes := Map(1, "closed", 2, "no_verified_panel", 3, "ambiguous_panel", 4, "close_not_confirmed", 5, "rejected", 6, "helper_timeout_no_other_action", 7, "panel_present", 8, "panel_absent", 9, "panel_not_ready")
     CloseLastResult := codes.Has(packed & 255) ? codes[packed & 255] : "helper_result_unknown"
     CloseLatencyMs := A_TickCount - CloseStartedTick
     CloseBusy := false
@@ -112,17 +130,23 @@ CloseBrokerResult(packed, token, *) {
         }
     }
     try WriteCloseStatus()
+    if IsObject(InputState) && InputState.Generation = PendingBrokerGeneration
+        PanelActionCompleted(PendingBrokerAction, CloseLastResult)
+    else
+        ActionState.Cancel()
 }
 WatchCloseWorker(*) {
-    global CloseBrokerHandle, CloseBrokerReady, CloseBusy, CloseStartedTick, CloseLastResult
+    global CloseBrokerHandle, CloseBrokerReady, CloseBusy, CloseStartedTick, CloseLastResult, ActionState
     if CloseBrokerHandle && DllCall("WaitForSingleObject", "Ptr", CloseBrokerHandle, "UInt", 0) = 0 {
         CloseBrokerReady := false, CloseBusy := false
         CloseLastResult := "helper_not_ready"
         SetTimer(WatchCloseWorker, 0)
+        ActionState.Cancel()
         try WriteCloseStatus()
     } else if CloseBusy && A_TickCount - CloseStartedTick > 2500 {
         CloseBusy := false
         CloseLastResult := "helper_timeout_no_other_action"
+        ActionState.Cancel()
     }
 }
 StopCloseWorker(*) {

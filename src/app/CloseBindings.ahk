@@ -1,17 +1,9 @@
-﻿; The independent close action is deliberately limited to standard mouse buttons.
-global RecordingTarget := "open", ProposedTriggerSpec := 0, ProposedCloseSpec := 0
-global CloseRecordButton := 0, OpenRecordButton := 0
-
+global ProposedTriggerSpec := 0, ProposedCloseSpec := 0, OpenRecordButton := 0, CloseRecordButton := 0
 ValidateBindingPair(openKey, closeKey) {
-    open := ResolveKeySpec(openKey)
-    if !KeyAllowedForBinding(open)
-        throw Error(open.Reason)
-    close := closeKey = "" ? 0 : ResolveKeySpec(closeKey)
-    if IsObject(close) && (!close.Mouse || !close.Allowed)
-        throw Error("关闭键仅支持鼠标中键、XButton1 或 XButton2。")
-    if IsObject(close) && open.Key = close.Key
-        throw Error("唤起键和关闭键不能相同，请重新录制。")
-    return {Open: open, Close: close}
+    open := ResolveKeySpec(openKey), close := closeKey = "" ? 0 : ResolveKeySpec(closeKey)
+    if !KeyAllowedForBinding(open) || (IsObject(close) && !KeyAllowedForBinding(close))
+        throw Error("请选择 Windows 能上报的一个键盘键、鼠标键或滚轮方向。")
+    return {Open: open, Close: close, Shared: IsObject(close) && open.Key = close.Key}
 }
 LoadCloseBinding() {
     global CloseKey, CloseBindingSpec, TriggerKey, ConfigPath
@@ -20,69 +12,51 @@ LoadCloseBinding() {
         close := TriggerKey = "XButton2" ? "" : "XButton2"
         IniWrite(close, ConfigPath, "Mapping", "CloseKey")
     }
-    try pair := ValidateBindingPair(TriggerKey, close)
-    catch {
-        ; Never replace the user's working open key to resolve a conflict.
-        CloseKey := "", CloseBindingSpec := 0
-        return
-    }
-    CloseKey := IsObject(pair.Close) ? pair.Close.Key : ""
-    CloseBindingSpec := pair.Close
+    pair := ValidateBindingPair(TriggerKey, close)
+    TriggerKey := pair.Open.Key, CloseKey := IsObject(pair.Close) ? pair.Close.Key : "", CloseBindingSpec := pair.Close
 }
 PersistBindingPair(open, close) {
     global ConfigPath
     IniWrite(open, ConfigPath, "Mapping", "Key")
     IniWrite(close, ConfigPath, "Mapping", "CloseKey")
 }
-SaveBindingPair(open, close, persist := 0, binder := 0) {
-    global TriggerKey, CloseKey, CloseBindingSpec, CloseMappedHeld, ConfigPath
-    global Held, NativeHeld, RestoredDown, RecordHeldVK, MouseMappedHeld, SelectedPhysicalDown, ModifierPending
-    pair := ValidateBindingPair(open, close)
-    if Held || NativeHeld || RestoredDown || RecordHeldVK || MouseMappedHeld || CloseMappedHeld || SelectedPhysicalDown || IsObject(ModifierPending)
-        || GetKeyState(TriggerKey, "P") || GetKeyState(pair.Open.Key, "P")
-        || (CloseKey != "" && GetKeyState(CloseKey, "P"))
-        || (IsObject(pair.Close) && GetKeyState(pair.Close.Key, "P"))
-        throw Error("请先松开所有唤起键、关闭键和录制键，再保存。")
-    oldOpen := TriggerKey, oldClose := CloseKey, oldSpec := CloseBindingSpec
-    original := FileRead(ConfigPath, "RAW")
-    Critical("On")
-    try {
-        CloseKey := "", CloseBindingSpec := 0
-        SwitchTriggerKey(pair.Open.Key, (*) => 0, binder)
-        CloseKey := IsObject(pair.Close) ? pair.Close.Key : ""
-        CloseBindingSpec := pair.Close
-        (persist ? persist : PersistBindingPair)(TriggerKey, CloseKey)
-    } catch as problem {
-        try {
-            CloseKey := "", CloseBindingSpec := 0
-            SwitchTriggerKey(oldOpen, (*) => 0, binder)
-            CloseKey := oldClose, CloseBindingSpec := oldSpec
-            stream := FileOpen(ConfigPath, "w")
-            stream.RawWrite(original), stream.Close()
-        } catch {
-            ExitApp(1)
-        }
-        throw problem
-    } finally Critical("Off")
+BoundSpecPhysicallyDown(spec) {
+    return IsObject(spec) && !spec.Wheel && (DllCall("GetAsyncKeyState", "Int", spec.VK, "Short") & 0x8000)
 }
-RememberRecordedCandidate() {
-    global RecordedSpec, RecordingTarget, ProposedTriggerSpec, ProposedCloseSpec
-    if IsObject(RecordedSpec) && RecordedSpec.Allowed {
-        if RecordingTarget = "close"
-            ProposedCloseSpec := RecordedSpec
-        else
-            ProposedTriggerSpec := RecordedSpec
+SaveBindingPair(open, close, persist := 0, binder := 0) {
+    global TriggerKey, CloseKey, CloseBindingSpec, ConfigPath, InputState, RecordHeldVK, ActionState
+    pair := ValidateBindingPair(open, close)
+    oldOpen := ResolveKeySpec(TriggerKey), oldClose := CloseBindingSpec
+    if RecordHeldVK || (IsObject(InputState) && InputState.HasHeld())
+        || BoundSpecPhysicallyDown(pair.Open) || BoundSpecPhysicallyDown(pair.Close)
+        || BoundSpecPhysicallyDown(oldOpen) || BoundSpecPhysicallyDown(oldClose)
+        throw Error("请先松开新旧绑定及录制中的按键，再保存。")
+    original := FileRead(ConfigPath, "RAW")
+    try {
+        (persist ? persist : PersistBindingPair)(pair.Open.Key, IsObject(pair.Close) ? pair.Close.Key : "")
+        if IsObject(binder)
+            binder.Call(pair.Open.Key, true)
+        TriggerKey := pair.Open.Key, CloseKey := IsObject(pair.Close) ? pair.Close.Key : "", CloseBindingSpec := pair.Close
+        if IsObject(InputState)
+            InputState.Configure(pair.Open, pair.Close)
+        ActionState := PanelActionState()
+    } catch as problem {
+        stream := FileOpen(ConfigPath, "w")
+        try stream.RawWrite(original)
+        finally stream.Close()
+        TriggerKey := oldOpen.Key, CloseKey := IsObject(oldClose) ? oldClose.Key : "", CloseBindingSpec := oldClose
+        if IsObject(InputState)
+            InputState.Configure(oldOpen, oldClose)
+        throw problem
     }
 }
 BeginOpenKeyRecording(*) {
     global RecordingTarget, RecordButton, OpenRecordButton
-    RememberRecordedCandidate()
     RecordingTarget := "open", RecordButton := OpenRecordButton
     BeginKeyRecording()
 }
 BeginCloseKeyRecording(*) {
     global RecordingTarget, RecordButton, CloseRecordButton
-    RememberRecordedCandidate()
     RecordingTarget := "close", RecordButton := CloseRecordButton
     BeginKeyRecording()
 }

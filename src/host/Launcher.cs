@@ -12,7 +12,7 @@ internal static class Launcher {
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr GetProp(IntPtr hwnd,string name);
     [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hwnd,uint msg,IntPtr w,IntPtr l);
     static string Read(string file,string key) { var value=new StringBuilder(128);GetPrivateProfileString("State",key,"0",value,128,file);return value.ToString(); }
-    static string Data(string root) {
+    internal static string Data(string root) {
         var isolated=Environment.GetEnvironmentVariable("WIN_VOICE_HOTKEY_DATA_DIR");
         if(!String.IsNullOrEmpty(isolated))return Path.GetFullPath(isolated);
         return File.Exists(Path.Combine(root,"portable.flag"))?Path.Combine(root,"data"):Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"WinVoiceHotkey");
@@ -24,11 +24,46 @@ internal static class Launcher {
         if(actual!=pid||GetProp(new IntPtr(hwnd),"WinVoiceHotkeyInstance").ToInt64()!=token)return false;
         return PostMessage(new IntPtr(hwnd),message,IntPtr.Zero,IntPtr.Zero);
     }
+    static int StopError(int code,string message) {
+        WriteError(message);
+        return code;
+    }
+    internal static void WriteError(string message) {
+        byte[] bytes=Encoding.UTF8.GetBytes(message+Environment.NewLine);
+        using(var stream=Console.OpenStandardError()){stream.Write(bytes,0,bytes.Length);stream.Flush();}
+    }
+    internal static int StopAndConfirm(string data) {
+        string state=Path.Combine(data,"mapping-state.ini");
+        if(!File.Exists(state))return 0;
+        uint pid;
+        if(!uint.TryParse(Read(state,"PID"),out pid)||pid==0)
+            return StopError(2,"退出状态无效，未发送请求。 / Invalid instance state; no request was sent.");
+        Process target=null;
+        try {
+            try {
+                target=Process.GetProcessById(checked((int)pid));
+                IntPtr handle=target.Handle; // Retain the process handle before sending, so the wait uses this instance.
+            } catch(ArgumentException) {
+                return 0; // The recorded instance is no longer running.
+            } catch(OverflowException) {
+                return StopError(2,"退出状态中的 PID 无效。 / Invalid PID in instance state.");
+            } catch(System.ComponentModel.Win32Exception) {
+                return StopError(2,"无法访问目标实例，未发送请求。 / Cannot access the target instance; no request was sent.");
+            }
+            if(!Signal(data,0x805E))
+                return StopError(2,"无法核验目标实例或发送退出请求。 / Cannot verify the instance or send the stop request.");
+            if(!target.WaitForExit(3000))
+                return StopError(3,"已发送退出请求，但目标实例未在 3 秒内退出。 / Stop requested, but the instance did not exit within 3 seconds.");
+            return 0;
+        } finally {
+            if(target!=null)target.Dispose();
+        }
+    }
     [STAThread] static int Main(string[] args) {
         try {
             string root=AppDomain.CurrentDomain.BaseDirectory,data=Data(root);
             string action=args.Length==0?"":args[0];
-            if(action=="--stop") { Signal(data,0x805E);return 0; }
+            if(action=="--stop")return StopAndConfirm(data);
             if(action=="--settings"&&Signal(data,0x805F))return 0;
             if(action!=""&&action!="--settings"&&action!="--smoke-test")return 64;
             Directory.CreateDirectory(data);
@@ -40,6 +75,10 @@ internal static class Launcher {
             start.EnvironmentVariables["WIN_VOICE_HOTKEY_DATA_DIR"]=data;
             using(var process=Process.Start(start)) { if(action=="--smoke-test") {if(!process.WaitForExit(15000)){process.Kill();return 124;}return process.ExitCode;} }
             return 0;
-        } catch(Exception error) {MessageBox.Show(error.Message,"Win Voice Hotkey",MessageBoxButtons.OK,MessageBoxIcon.Error);return 1;}
+        } catch(Exception error) {
+            if(args.Length>0&&args[0]=="--stop")WriteError(error.Message);
+            else MessageBox.Show(error.Message,"Win Voice Hotkey",MessageBoxButtons.OK,MessageBoxIcon.Error);
+            return 1;
+        }
     }
 }

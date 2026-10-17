@@ -12,7 +12,7 @@ if !SmokeTest {
     ApplicationMutex := DllCall("CreateMutexW", "Ptr", 0, "Int", false, "WStr", "Local\WinVoiceHotkey.App", "Ptr")
     if !ApplicationMutex || A_LastError = 183
         ExitApp()
-    OnExit((*) => DllCall("CloseHandle", "Ptr", ApplicationMutex))
+    OnExit(ReleaseApplicationMutex)
 }
 global StartupLink := (SmokeTest ? DataDir "\startup-test" : A_Startup) "\WinVoiceHotkey.lnk"
 global LauncherPath := A_ScriptDir "\..\WinVoiceHotkey.exe"
@@ -67,4 +67,14 @@ RunSmokeTest(*) {
         FileAppend(problem.Message, DataDir "\smoke-error.txt", "UTF-8-RAW")
         ExitApp(1)
     }
+}
+
+ReleaseApplicationMutex(*) {
+    global ApplicationMutex
+    if ApplicationMutex {
+        handle := ApplicationMutex
+        ApplicationMutex := 0
+        DllCall("CloseHandle", "Ptr", handle)
+    }
+    return 0
 }

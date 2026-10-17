@@ -1,11 +1,11 @@
-# 发布来源与边界审查
+# 发布来源与边界
 
-运行入口为 `src/app/WinHGate.ahk`，包含 KeyCatalog、KeyboardObserver → MouseObserver、GlobalModifierTap、KeySettings → CloseBindings、GlobalRuntime、CloseBrokerRuntime → PanelWindowTracker。状态入口只包含 AppPaths 与 KeyCatalog。C# 关闭进程由 VoicePanelCore 与 VoicePanelBroker 构建；Launcher 和 Installer 是发行整理时新增的宿主程序。
+运行入口 WinHGate.ahk 使用 AppPaths、KeyCatalog、SupportDiagnostics、InputRouter、KeyboardObserver（含 MouseObserver）、KeySettings（含 CloseBindings）、GlobalRuntime 与 CloseBrokerRuntime（含 PanelWindowTracker）。C# 代理由 VoicePanelCore/VoicePanelBroker 构建，宿主为 Launcher/Installer。保留的测试 fixture 不进入正常应用入口。
 
-所提供本地原型文档将该功能描述为单键 AutoHotkey Win+H 原型。纳入的原始 AHK/C# 文件没有原有项目 LICENSE、版权头或外部代码来源标注。没有发现当前入口引用 CapsWriter 客户端/服务器、模型或第三方 UIA-v2 代码；相关历史文件均排除。保留代码来源于这个本地原型，不能仅因工作目录曾带 CapsWriter 名称，就推断它继承了 CapsWriter 的许可；同样，没有版权头也不能单独证明所有代码原创。2026-10-16，项目所有者明确确认：本工具代码采用 MIT，第三方运行时保留原 GPL 及对应源码。
+项目来自所有者的本地 Win+H 原型，不包含 CapsWriter ASR 模型、Python 客户端/服务器、旧焦点适配器或第三方 UIA-v2 代码。项目所有者已授权项目专用代码采用原仓库 MIT 许可；没有把这一授权扩展到第三方解释器。
 
-独立打包的第三方只有未修改的 AutoHotkey 2.0.30 解释器，其摘要、完整许可、对应源码与上游声明按原许可保留。源码归档带有其自身的嵌入库与原始声明，未作为本工具原创代码重许可。
+AutoHotkey 2.0.30 未修改，固定运行时摘要、完整许可和对应上游源码按原声明保留。系统 Windows/.NET 二进制不随包分发。具体来源、许可和摘要见 THIRD_PARTY_NOTICES.md、dependencies.lock.json 与 third-party。
 
-发行整理的必要改动：运行配置/状态与就绪文件转入独立数据目录；更改本项目窗口属性名称以隔离旧安装；关闭触发/窗口详细日志；增加按用户自启、启动宿主、隔离冒烟测试和安装/卸载。语义关闭仍只调用真实 Windows 语音面板 CloseButton.Invoke，不加入固定坐标、WM_CLOSE 或结束系统进程的备用路径。
+公开仓库按源码、脚本、测试、文档和声明清单组装，不复制日常安装目录或整个工作目录。排除真实配置、状态、日志、备份、录音、凭据、本机路径及个人报告。测试公开结果只含脱敏计数和布尔摘要。默认不保存触发历史；支持诊断需显式启用且不自动上传。
 
-公开内容按源码/文档清单组装；不拷贝用户 config、运行状态、录音、聊天/窗口数据、历史截图、原始验收报告、备份或其他项目文件。测试结果仅包含断言、计数器与布尔结果。模式扫描与人工审查互相补充；不以扫描结果宣称不存在任何安全问题。
+0.1.2 汇总已经使用的本地修复及设置更新，仅改公开版本元数据和文档，不借发布新增系统设置或更改日常个人绑定。检查脚本与人工审查互相补充，不把模式扫描当作安全认证。

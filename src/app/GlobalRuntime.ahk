@@ -1,32 +1,74 @@
-﻿; Global key mapping: no UIA, MSAA, IA2, focus or editable-control probes.
-global VoiceDispatchSink := 0
-GlobalPressAllowed(injected, down, settings, modifiers, nativeHeld, held) =>
-    !injected && down && !settings && (held || (!nativeHeld && !modifiers))
+; Actions are queued outside low-level hooks. Shared bindings query actual panel state.
+global VoiceDispatchSink := 0, BoundActionNotificationSink := 0
+global InputState := 0, RecoveryPaused := false, RecoveryWaiting := false
+global ActionState := PanelActionState(), PendingBrokerAction := "close"
 
-GateReady(*) {
-    global SelectedEventInjected, SelectedPhysicalDown, SettingsOpen, NativeHeld, Held
-    return GlobalPressAllowed(SelectedEventInjected, SelectedPhysicalDown, SettingsOpen, ModifiersHeld(), NativeHeld, Held)
+class PanelActionState {
+    __New() {
+        this.Busy := false, this.LastAction := -10000, this.OpeningUntil := 0, this.Presence := "unknown"
+    }
+    Begin(role, now) {
+        if this.Busy || now - this.LastAction < 200
+            return ""
+        this.LastAction := now
+        if role = 1
+            return "open"
+        this.Busy := true
+        return role = 3 ? "toggle" : "close"
+    }
+    Finish(mode, status, now) {
+        this.Busy := false
+        if status = "panel_present" || status = "panel_not_ready" {
+            this.Presence := "present", this.OpeningUntil := 0
+        } else if status = "closed" {
+            this.Presence := "absent", this.OpeningUntil := 0
+        } else if status = "panel_absent" {
+            this.Presence := "absent"
+            if mode = "toggle" && now >= this.OpeningUntil {
+                this.OpeningUntil := now + 5000
+                return "open"
+            }
+        }
+        return ""
+    }
+    NativeHidden() {
+        this.OpeningUntil := 0
+    }
+    PollNeeded(now) {
+        if this.OpeningUntil && now >= this.OpeningUntil
+            this.OpeningUntil := 0
+        return this.OpeningUntil > now
+    }
+    Cancel() {
+        this.Busy := false
+    }
 }
-ModifiersHeld() => GetKeyState("Ctrl", "P") || GetKeyState("Alt", "P")
-    || GetKeyState("Shift", "P") || GetKeyState("LWin", "P") || GetKeyState("RWin", "P")
-TriggerIsDown() {
-    global SelectedPhysicalDown
-    return SelectedPhysicalDown
+ModifiersHeld() {
+    global InputState
+    return IsObject(InputState) && InputState.OtherModifiers()
 }
-WaitTriggerRelease() {
-    while TriggerIsDown()
-        Sleep(10)
+QueueBoundAction(role, generation) {
+    global BoundActionNotificationSink
+    if IsObject(BoundActionNotificationSink)
+        BoundActionNotificationSink.Call(role, generation)
+    else
+        DllCall("PostMessageW", "Ptr", A_ScriptHwnd, "UInt", 0x8060, "Ptr", role, "Ptr", generation)
 }
-TriggerVoice(*) {
-    global Held, SettingsOpen, SelectedEventInjected, SelectedPhysicalDown
-    if Held
+OnBoundAction(role, generation, *) {
+    global SettingsOpen, RecoveryPaused, InputState
+    if SettingsOpen || RecoveryPaused || !IsObject(InputState) || generation != InputState.Generation
         return
-    Held := true
-    try {
-        if !SettingsOpen && !SelectedEventInjected && SelectedPhysicalDown && !ModifiersHeld()
-            DispatchVoiceRequest()
-        WaitTriggerRelease()
-    } finally Held := false
+    SetTimer((*) => DispatchBoundAction(role, generation), -15)
+}
+DispatchBoundAction(role, generation) {
+    global SettingsOpen, RecoveryPaused, InputState, ActionState
+    if SettingsOpen || RecoveryPaused || generation != InputState.Generation || ModifiersHeld()
+        return
+    mode := ActionState.Begin(role, A_TickCount)
+    if mode = "open"
+        DispatchVoiceRequest()
+    else if mode != "" && !StartCloseWorker(mode)
+        ActionState.Cancel()
 }
 DispatchVoiceRequest() {
     global VoiceDispatchSink
@@ -34,33 +76,59 @@ DispatchVoiceRequest() {
         VoiceDispatchSink.Call()
         return
     }
-    LogGateEvent("voice_shortcut_requested")
     Send("#h")
 }
-ObserveNativePress(*) {
-    global NativeHeld, SelectedEventInjected
-    if SelectedEventInjected
+PanelActionCompleted(mode, status) {
+    global ActionState, SettingsOpen, RecoveryPaused
+    SupportLog("panel_result", "mode=" mode " status=" status)
+    next := ActionState.Finish(mode, status, A_TickCount)
+    if next = "open" && !SettingsOpen && !RecoveryPaused {
+        DispatchVoiceRequest()
+        SetTimer(PollOpeningPanel, 250)
+    }
+    if !ActionState.PollNeeded(A_TickCount)
+        SetTimer(PollOpeningPanel, 0)
+}
+PollOpeningPanel(*) {
+    global ActionState, SettingsOpen, RecoveryPaused, CloseBusy
+    if !ActionState.PollNeeded(A_TickCount) {
+        SetTimer(PollOpeningPanel, 0)
         return
-    NativeHeld := true
-    try WaitTriggerRelease()
-    finally NativeHeld := false
-}
-; Retained binder compatibility; global mapping never synthesizes selected keys.
-RecoveryActive(*) => false
-RecoveredNativeRelease(*) {
-}
-ReleaseRestoredKey(*) {
+    }
+    if SettingsOpen || RecoveryPaused || CloseBusy || ActionState.Busy
+        return
+    ActionState.Busy := true
+    if !StartCloseWorker("presence")
+        ActionState.Cancel()
 }
 RefreshGate() {
-    global StopRequest, NativeHeld, ModifierPending, SettingsOpen, PendingTapCount
+    global StopRequest
     if FileExist(StopRequest) {
         FileDelete(StopRequest)
         ExitApp()
     }
-    if SettingsOpen {
-        ModifierPending := 0
-        PendingTapCount := 0
-    }
-    if NativeHeld && !TriggerIsDown()
-        NativeHeld := false
 }
+EmergencyOpenSettings(*) {
+    global RecoveryPaused, RecoveryWaiting, InputState
+    RecoveryPaused := true, RecoveryWaiting := true
+    if IsObject(InputState)
+        InputState.Pause()
+    SetTimer(WaitRecoveryRelease, 50)
+}
+WaitRecoveryRelease(*) {
+    for key in ["LCtrl", "RCtrl", "LAlt", "RAlt", "LShift", "RShift", "F12"]
+        if GetKeyState(key, "P") || GetKeyState(key)
+            return
+    SetTimer(WaitRecoveryRelease, 0)
+    global RecoveryWaiting
+    RecoveryWaiting := false
+    OpenKeySettings()
+}
+StopActionTimers(*) {
+    SetTimer(PollOpeningPanel, 0)
+    SetTimer(WaitRecoveryRelease, 0)
+}
+ReleaseRestoredKey(*) {
+}
+GlobalPressAllowed(injected, down, settings, modifiers, nativeHeld, held) =>
+    !injected && down && !settings && (held || (!nativeHeld && !modifiers))

@@ -1,57 +1,77 @@
-[
-  {
-    "result": {
-      "passed": 142,
-      "voice_dispatch_counter": 12,
-      "actual_send_calls": 0,
-      "hooks_installed": false,
-      "microphone_used": false
-    },
-    "name": "GlobalMappingUnitCheck"
-  },
-  {
-    "result": {
-      "passed": 156,
-      "dispatch_counter": 42,
-      "real_WinH_sent": false,
+{
+  "version": "0.1.2",
+  "date": "2026-10-17",
+  "currentSource": {
+    "ahk": {
+      "passed": 1539,
+      "global_hooks_installed": false,
       "microphone_used": false,
-      "user_config_modified": false,
-      "native_hook_install_uninstall": "isolated_test_desktop"
+      "WinH_sent": false,
+      "real_UIA_invoked": false
     },
-    "name": "MouseMappingUnitCheck"
-  },
-  {
-    "result": {
-      "passed": 132,
-      "open_counter": 3,
-      "close_counter": 4,
-      "real_voice_sent": false,
-      "real_panel_closed": false,
-      "user_config_modified": false
-    },
-    "name": "CloseBindingsUnitCheck"
-  },
-  {
-    "result": {
-      "settings_opened": true,
-      "settings_closed": true,
-      "startup_roundtrip": true,
-      "broker_ready": true,
-      "hooks_installed": false,
+    "desktop": "Dedicated invisible test desktop; never switched",
+    "panelCore": {
+      "passed": 8,
+      "real_UIA_invoked": false,
       "microphone_used": false
     },
-    "name": "portable-smoke"
+    "scope": "No voice input, microphone, global hooks, real UIA invoke, or production configuration changes"
   },
-  {
-    "result": {
-      "realStartupModified": false,
-      "exit": true,
-      "unrelatedFilePreserved": true,
-      "uninstall": true,
-      "configPreserved": true,
-      "install": true,
-      "settings": true
-    },
-    "name": "installer"
+  "settings": {
+    "evidence": "Application own hidden GUI control bounds; not a screenshot",
+    "sizes": [
+      [
+        360,
+        320
+      ],
+      [
+        360,
+        400
+      ],
+      [
+        420,
+        480
+      ],
+      [
+        640,
+        640
+      ],
+      [
+        900,
+        720
+      ]
+    ],
+    "localDpi": 144,
+    "visualAcceptance": false
+  },
+  "historicalRegression": {
+    "stopAndLifecycle": 32,
+    "installerStopGate": 93,
+    "rerunThisRelease": false
+  },
+  "physicalAcceptance": {
+    "xButton2TrueClose": true,
+    "rightShiftSameKey": true,
+    "recordingSpecificRetest": false,
+    "allDevicesTested": false,
+    "manualCloseThenReopen": true,
+    "singleMachine": true
+  },
+  "knownIssues": [
+    "One login produced stale runtime state; normal restart recovered; cause not established.",
+    "Latest settings final visual acceptance unavailable."
+  ],
+  "liveDailyApplicationChangedForRelease": false,
+  "localPackaging": {
+    "isolatedInstall": true,
+    "noInputSmoke": true,
+    "settingsOpenedClosed": true,
+    "brokerReady": true,
+    "isolatedStartupShortcutRoundtrip": true,
+    "uninstall": true,
+    "configAndUnrelatedFileRetained": true,
+    "defaultOpen": "XButton1",
+    "defaultClose": "XButton2",
+    "dailyProcessesAndConfigUnchanged": true
   }
-]
+}

@@ -1,12 +1,13 @@
-﻿#Requires AutoHotkey v2.0
+#Requires AutoHotkey v2.0
 #SingleInstance Ignore
 #MaxThreadsPerHotkey 1
 #Warn All, StdOut
 OnError(ReportRuntimeError)
 #Include AppPaths.ahk
 #Include KeyCatalog.ahk
+#Include SupportDiagnostics.ahk
+#Include InputRouter.ahk
 #Include KeyboardObserver.ahk
-#Include GlobalModifierTap.ahk
 #Include KeySettings.ahk
 #Include GlobalRuntime.ahk
 #Include CloseBrokerRuntime.ahk
@@ -41,11 +42,6 @@ OnExit(StopPanelWindowTracker)
 StartCloseBroker()
 
 KeyHistory(0)
-if !SmokeTest
-    InstallKeybdHook()
-; Do not treat a key already held when the script starts as a fresh press.
-KeyWait(TriggerKey, "L")
-KeyWait(TriggerKey)
 global Snapshot := 0, SnapshotTick := 0, Held := false
 global NativeHeld := false
 global RestoredDown := false
@@ -59,11 +55,12 @@ OnExit(MappingExited)
 OnExit(StopKeyboardObserver)
 OnExit(StopMouseObserver)
 OnExit(StopCloseWorker)
+OnExit(StopActionTimers)
 OnMessage(0x8055, RecordingCompleted)
 OnMessage(0x8056, RecordingCombinationDetected)
-OnMessage(0x8057, MouseTriggerVoice)
-OnMessage(0x8058, MouseCloseVoice)
-A_IconTip := "语音输入：打开 " initialSpec.Label "；关闭 " (CloseKey = "" ? "未设置" : ResolveKeySpec(CloseKey).Label)
+OnMessage(0x8060, OnBoundAction)
+UpdateMappingTooltip()
+SupportLog("loaded", "open=" TriggerKey " close=" CloseKey " config=" ConfigPath)
 WriteMappingStatus(true)
 LogGateEvent("mapping_started")
 ; Other mapping tools must not own the same key. No other process is stopped.
@@ -86,14 +83,15 @@ Loop DllCall("GetMenuItemCount", "Ptr", A_TrayMenu.Handle) {
 }
 IniWrite(DllCall("GetCurrentProcessId", "UInt"), DataDir "\mapping-state.ini", "Tray", "PID")
 SetTimer(RefreshGate, 75)
+BindTriggerKey(TriggerKey, true)
 if SmokeTest
     SetTimer(RunSmokeTest, -300)
 else
-    BindTriggerKey(TriggerKey, true)
+    Hotkey("^!+F12", EmergencyOpenSettings)
 for argument in A_Args
     if argument = "--settings"
         SetTimer(OpenKeySettings, -100)
-TrayTip("打开键：" initialSpec.Label "；关闭键：" (CloseKey = "" ? "未设置" : ResolveKeySpec(CloseKey).Label) "。右键托盘可设置或退出。", "语音输入")
+; Ordinary start/repeated launches do not generate Windows notifications.
 
 WriteMappingStatus(running) {
     global DataDir
@@ -102,7 +100,8 @@ WriteMappingStatus(running) {
     IniWrite(running ? 1 : 0, stateFile, "State", "Running")
     IniWrite(DllCall("GetCurrentProcessId", "UInt"), stateFile, "State", "PID")
     IniWrite(TriggerKey, stateFile, "State", "Key")
-    IniWrite("0.1.1", stateFile, "State", "Version")
+    IniWrite("0.1.2", stateFile, "State", "Version")
+    IniWrite("release-0.1.2", stateFile, "State", "CandidateBuild")
     IniWrite(A_ScriptHwnd, stateFile, "State", "HWND")
     IniWrite(StatusToken, stateFile, "State", "InstanceToken")
     IniWrite(PhysicalTest ? "physical_diagnostic_no_voice" : HookTest ? "synthetic_diagnostic_no_voice" : "global_voice_mapping", stateFile, "State", "Mode")

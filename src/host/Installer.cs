@@ -4,11 +4,14 @@ using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 using System.Collections.Generic;
-using System.Threading;
 using System.Windows.Forms;
 
 internal static class Installer {
     const string Marker=".win-voice-hotkey-install";
+    sealed class StopFailure:Exception {
+        public readonly int Code;
+        public StopFailure(int code,string message):base(message){Code=code;}
+    }
     static string DefaultTarget {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Programs","WinVoiceHotkey");}}
     static void Shortcut(string target,string path) {
         Type type=Type.GetTypeFromProgID("WScript.Shell");object shell=Activator.CreateInstance(type);
@@ -17,25 +20,66 @@ internal static class Installer {
         lt.InvokeMember("WorkingDirectory",BindingFlags.SetProperty,null,link,new object[]{Path.GetDirectoryName(target)});
         lt.InvokeMember("Save",BindingFlags.InvokeMethod,null,link,null);
     }
+    static List<string> InstalledFiles(string folder) {
+        string manifest=Path.Combine(folder,"install-files.txt");
+        if(!File.Exists(manifest))throw new IOException("安装文件清单缺失，未更改安装文件。请恢复完整安装目录后重试。");
+        var files=new List<string>();
+        foreach(string relative in File.ReadAllLines(manifest)) {
+            string file=Path.GetFullPath(Path.Combine(folder,relative));
+            if(!file.StartsWith(folder+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))throw new IOException("安装文件清单路径无效，未更改安装文件。");
+            files.Add(file);
+        }
+        return files;
+    }
+    static void StopBeforeChangingFiles(string folder) {
+        const string retry="未继续覆盖或删除安装文件。请先从托盘退出 Win Voice Hotkey，确认已退出后重试；如提示状态校验失败，请先启动完整旧版以刷新状态，再退出后重试。不要直接删除运行中的程序文件。";
+        int code;
+        try {
+            // Never trust the old launcher's exit code: v0.1.1 can report zero while still running.
+            // Compile the fixed launcher's retained-handle/token verification into this installer too.
+            code=Launcher.StopAndConfirm(Launcher.Data(folder));
+        } catch(Exception error){throw new StopFailure(2,"无法完成停止检查："+error.Message+"。"+retry);}
+        if(code!=0)throw new StopFailure(code==3?3:2,
+            (code==3?"旧实例退出超时。":"旧实例校验或停止失败（退出码 "+code+"）。")+retry);
+    }
     static void Install(string folder,bool isolated) {
         folder=Path.GetFullPath(folder);
-        if(Directory.Exists(folder)&&Directory.GetFileSystemEntries(folder).Length!=0)throw new IOException("目标目录非空；请先卸载旧版，或选择空目录。 / Destination must be empty.");
-        Directory.CreateDirectory(folder);
+        bool upgrade=File.Exists(Path.Combine(folder,Marker));
+        if(Directory.Exists(folder)&&Directory.GetFileSystemEntries(folder).Length!=0&&!upgrade)
+            throw new IOException("目标目录非空且不是可识别的安装目录，请选择空目录；未覆盖现有文件。");
+        var oldFiles=upgrade?InstalledFiles(folder):new List<string>();
+        var owned=new HashSet<string>(oldFiles,StringComparer.OrdinalIgnoreCase);
         var installed=new List<string>();
         using(var resource=Assembly.GetExecutingAssembly().GetManifestResourceStream("payload.zip")) {
             if(resource==null)throw new InvalidOperationException("Installer payload is missing.");
-            using(var zip=new ZipArchive(resource,ZipArchiveMode.Read))foreach(var entry in zip.Entries) {
-                string file=Path.GetFullPath(Path.Combine(folder,entry.FullName.Replace('/',Path.DirectorySeparatorChar)));
-                if(!file.StartsWith(folder+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))throw new IOException("Invalid package path.");
-                if(entry.FullName.EndsWith("/")) {Directory.CreateDirectory(file);continue;}
-                Directory.CreateDirectory(Path.GetDirectoryName(file));entry.ExtractToFile(file,false);installed.Add(entry.FullName);
+            using(var zip=new ZipArchive(resource,ZipArchiveMode.Read)) {
+                // Validate all destinations before stopping or changing an existing installation.
+                foreach(var entry in zip.Entries) {
+                    string file=Path.GetFullPath(Path.Combine(folder,entry.FullName.Replace('/',Path.DirectorySeparatorChar)));
+                    if(!file.StartsWith(folder+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))throw new IOException("Invalid package path.");
+                    if(!entry.FullName.EndsWith("/")&&File.Exists(file)&&!owned.Contains(file))
+                        throw new IOException("新版本文件与未归属本程序的现有文件冲突，未覆盖："+entry.FullName);
+                }
+                foreach(string reserved in new[]{"Uninstall.exe",Marker})
+                    if(File.Exists(Path.Combine(folder,reserved))&&!owned.Contains(Path.Combine(folder,reserved)))
+                        throw new IOException("安装目录中的文件归属不明确，未覆盖："+reserved);
+                if(upgrade)StopBeforeChangingFiles(folder);
+                Directory.CreateDirectory(folder);
+                foreach(var entry in zip.Entries) {
+                    string file=Path.GetFullPath(Path.Combine(folder,entry.FullName.Replace('/',Path.DirectorySeparatorChar)));
+                    if(entry.FullName.EndsWith("/")){Directory.CreateDirectory(file);continue;}
+                    Directory.CreateDirectory(Path.GetDirectoryName(file));entry.ExtractToFile(file,upgrade);installed.Add(entry.FullName);
+                }
             }
         }
         File.Delete(Path.Combine(folder,"portable.flag"));
-        File.WriteAllText(Path.Combine(folder,Marker),"WinVoiceHotkey 0.1.1\n");
-        File.Copy(Assembly.GetExecutingAssembly().Location,Path.Combine(folder,"Uninstall.exe"));
+        File.WriteAllText(Path.Combine(folder,Marker),"WinVoiceHotkey 0.1.2\n");
+        File.Copy(Assembly.GetExecutingAssembly().Location,Path.Combine(folder,"Uninstall.exe"),upgrade);
         installed.Add("Uninstall.exe");installed.Add(Marker);
         File.WriteAllLines(Path.Combine(folder,"install-files.txt"),installed.ToArray());
+        var retained=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach(string relative in installed)retained.Add(Path.GetFullPath(Path.Combine(folder,relative)));
+        foreach(string file in oldFiles)if(!retained.Contains(file)&&File.Exists(file))File.Delete(file);
         if(!isolated) {
             string menu=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs),"Win Voice Hotkey");Directory.CreateDirectory(menu);
             Shortcut(Path.Combine(folder,"WinVoiceHotkey.exe"),Path.Combine(menu,"Win Voice Hotkey.lnk"));
@@ -44,32 +88,23 @@ internal static class Installer {
     }
     static void Uninstall(string folder,bool isolated) {
         folder=Path.GetFullPath(folder);
-        if(!File.Exists(Path.Combine(folder,Marker)))throw new IOException("安装标记缺失，未删除任何目录。 / Installation marker is missing.");
-        string launcher=Path.Combine(folder,"WinVoiceHotkey.exe");
-        if(File.Exists(launcher))using(var process=Process.Start(new ProcessStartInfo(launcher,"--stop"){UseShellExecute=false,CreateNoWindow=true})){process.WaitForExit(3000);}
-        Thread.Sleep(600);
+        if(!File.Exists(Path.Combine(folder,Marker)))throw new IOException("安装标记缺失，未删除任何目录。");
+        var files=InstalledFiles(folder);
+        StopBeforeChangingFiles(folder);
         if(!isolated) {
             string startup=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup),"WinVoiceHotkey.lnk");if(File.Exists(startup))File.Delete(startup);
             string menu=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs),"Win Voice Hotkey");
-            foreach(string name in new[]{"Win Voice Hotkey.lnk","Uninstall.lnk"}) {string link=Path.Combine(menu,name);if(File.Exists(link))File.Delete(link);}
+            foreach(string name in new[]{"Win Voice Hotkey.lnk","Uninstall.lnk"}){string link=Path.Combine(menu,name);if(File.Exists(link))File.Delete(link);}
             if(Directory.Exists(menu)&&Directory.GetFileSystemEntries(menu).Length==0)Directory.Delete(menu);
         }
         string self=Assembly.GetExecutingAssembly().Location;
         string manifest=Path.Combine(folder,"install-files.txt");
-        if(!File.Exists(manifest))throw new IOException("安装文件清单缺失，未删除程序文件。 / Installation manifest is missing.");
-        var files=new List<string>();
-        foreach(string relative in File.ReadAllLines(manifest)) {
-            string file=Path.GetFullPath(Path.Combine(folder,relative));
-            if(!file.StartsWith(folder+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))throw new IOException("Invalid uninstall path.");
-            files.Add(file);
-        }
         foreach(string file in files)if(!String.Equals(file,self,StringComparison.OrdinalIgnoreCase)&&File.Exists(file))File.Delete(file);
         File.Delete(manifest);
         var directories=Directory.GetDirectories(folder,"*",SearchOption.AllDirectories);
         Array.Sort(directories,(a,b)=>b.Length.CompareTo(a.Length));
         foreach(string dir in directories)if(Directory.GetFileSystemEntries(dir).Length==0)Directory.Delete(dir);
-        // Uninstall.exe remains as a small inert file because a running executable
-        // cannot delete itself. The user can delete this folder after exit.
+        // A running Uninstall.exe stays as an inert file; no self-delete helper is used.
     }
     [STAThread] static int Main(string[] args) {
         bool silent=Array.IndexOf(args,"--silent")>=0,isolated=Array.IndexOf(args,"--isolated")>=0;
@@ -77,10 +112,13 @@ internal static class Installer {
         string target=uninstall?AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar):DefaultTarget;
         for(int i=0;i<args.Length-1;i++)if(args[i]=="--target")target=args[i+1];
         try {
-            if(!silent&&MessageBox.Show(uninstall?"卸载 Win Voice Hotkey？保留个人配置。":"安装 Win Voice Hotkey 到当前用户目录？不需要管理员权限，不自动启用自启。\n\n"+target,"Win Voice Hotkey",MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return 0;
+            if(!silent&&MessageBox.Show(uninstall?"卸载 Win Voice Hotkey，保留用户配置？":"安装或升级 Win Voice Hotkey 到以下目录？\n\n"+target,"Win Voice Hotkey",MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return 0;
             if(uninstall)Uninstall(target,isolated);else Install(target,isolated);
-            if(!silent)MessageBox.Show(uninstall?"卸载完成。个人配置已保留；关闭后可删除剩余的安装目录。":"安装完成。请从开始菜单启动 Win Voice Hotkey。","Win Voice Hotkey");
+            if(!silent)MessageBox.Show(uninstall?"卸载完成，用户配置已保留。关闭后可删除剩余的安装目录。":"安装或升级完成。请启动 Win Voice Hotkey。","Win Voice Hotkey");
             return 0;
-        } catch(Exception error) {if(!silent)MessageBox.Show(error.Message,"Win Voice Hotkey",MessageBoxButtons.OK,MessageBoxIcon.Error);else Console.Error.WriteLine(error.Message);return 1;}
+        } catch(Exception error) {
+            if(!silent)MessageBox.Show(error.Message,"Win Voice Hotkey",MessageBoxButtons.OK,MessageBoxIcon.Error);else Launcher.WriteError(error.Message);
+            return error is StopFailure?((StopFailure)error).Code:1;
+        }
     }
 }

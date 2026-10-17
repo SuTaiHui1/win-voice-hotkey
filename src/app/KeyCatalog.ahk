@@ -1,8 +1,14 @@
 ﻿; Configuration is always a single safe key identifier, never hotkey syntax.
 global KeyFixtureMode := false
 KeySpecFromCodes(vk, sc) {
-    if vk < 8 || vk > 254 || vk = 0xE7 || sc < 0 || sc > 0x1FF
-        throw Error("不是可绑定的键盘单键。鼠标、文字注入与组合键不支持。")
+    if !UserKeyInScope(vk, sc)
+        throw Error("Windows 未提供可用的物理单键标识；Fn、硬件拦截键和系统安全序列无法保证捕获。")
+    if vk = 0x10
+        vk := (sc & 0xFF) = 0x36 ? 0xA1 : 0xA0
+    else if vk = 0x11
+        vk := sc & 0x100 ? 0xA3 : 0xA2
+    else if vk = 0x12
+        vk := sc & 0x100 ? 0xA5 : 0xA4
     ; AHK uses 136 as an internal Right-Shift identifier; native scan is 36.
     if vk = 0xA1 && sc
         sc := 0x036
@@ -20,49 +26,42 @@ KeySpecFromCodes(vk, sc) {
         key := "LCtrl"
     else if vk = 0xA3
         key := "RCtrl"
-    modifier := vk = 0xA0 || vk = 0xA1
-    reason := ""
-    if vk = 0x12 || vk = 0xA4 || vk = 0xA5 || vk = 0x5B || vk = 0x5C
-        reason := "Alt/Win 会打开系统菜单或改变焦点；为保留原组合键，当前不允许绑定。"
-    else if vk = 0x10 || vk = 0x11
-        reason := "请录制明确的左侧或右侧 Ctrl/Shift。"
-    else if vk = 0x13 || vk = 0x03
-        reason := "Pause/Break 的释放事件不可靠，不能保证按下/释放成对。"
-    else if vk = 0x5F
-        reason := "休眠等系统电源键不能保证安全拦截。"
-    else if !UserKeyInScope(vk, sc)
-        reason := "此键不在当前可选范围。支持 A–Z、0–9、标点/符号及小键盘数字/运算符、左右 Shift、CapsLock、Tab。"
+    else if vk = 0xA4
+        key := "LAlt"
+    else if vk = 0xA5
+        key := "RAlt"
+    else if vk = 0x5B
+        key := "LWin"
+    else if vk = 0x5C
+        key := "RWin"
+    modifier := (vk >= 0xA0 && vk <= 0xA5) || vk = 0x5B || vk = 0x5C
     bindingSC := SubStr(key, 1, 2) = "vk" ? 0 : sc
     return {Key: key, VK: vk, SC: bindingSC, Name: name, Modifier: modifier, Mouse: false,
-        Allowed: reason = "", Reason: reason, Label: KeyFriendlyName(name, vk, sc)}
+        Pulse: vk = 0x13 || vk = 0x03 || vk = 0x2C, Wheel: false,
+        Allowed: true, Reason: "", Label: KeyFriendlyName(name, vk, sc)}
 }
 
 UserKeyInScope(vk, sc) {
-    ; NumLock-off navigation VKs are still the same physical numpad keys.
-    numpad := sc >= 0x47 && sc <= 0x53
-    return (vk >= 0x41 && vk <= 0x5A) || (vk >= 0x30 && vk <= 0x39)
-        || (vk >= 0x60 && vk <= 0x69) || (vk >= 0x6A && vk <= 0x6F)
-        || (vk >= 0xBA && vk <= 0xC0) || (vk >= 0xDB && vk <= 0xDF) || vk = 0xE2
-        || numpad || vk = 0xA0 || vk = 0xA1 || vk = 0x14 || vk = 0x09
+    return (vk = 3 || (vk >= 8 && vk <= 254)) && vk != 0xE7 && sc >= 0 && sc <= 0x1FF
 }
 
 KeyAllowedForBinding(spec) {
-    global KeyFixtureMode
-    ; F24 is only an internal diagnostic transport, never a settings option.
-    return spec.Allowed || (KeyFixtureMode && spec.Key = "F24")
+    return IsObject(spec) && spec.Allowed
 }
 
 ResolveKeySpec(key) {
-    for mouseKey in ["MButton", "XButton1", "XButton2"]
+    for mouseKey in ["LButton", "RButton", "MButton", "XButton1", "XButton2", "WheelUp", "WheelDown", "WheelLeft", "WheelRight"]
         if StrLower(key) = StrLower(mouseKey)
             return MouseKeySpec(mouseKey)
     ; Named keyboard keys are accepted only after normalization to VK/SC.
     if RegExMatch(key, "i)^(sc[0-9a-f]{3}|vk[0-9a-f]{2})$") {
         sc := SubStr(key, 1, 2) = "sc" ? Integer("0x" SubStr(key, 3)) : 0
         vk := sc ? GetKeyVK(key) : Integer("0x" SubStr(key, 3))
+        if !sc
+            sc := GetKeySC(key)
     } else {
-        if !RegExMatch(key, "i)^(CapsLock|F(?:[1-9]|1[0-9]|2[0-4])|[a-z0-9]|Enter|Escape|Space|Tab|Backspace|Delete|Insert|Home|End|PgUp|PgDn|Up|Down|Left|Right|NumLock|ScrollLock|Numpad(?:[0-9]|Dot|Div|Mult|Add|Sub|Enter)|LCtrl|RCtrl|LControl|RControl|LShift|RShift|LAlt|RAlt|LWin|RWin|AppsKey|PrintScreen|Pause|CtrlBreak|Sleep|Help|Browser_[A-Za-z]+|Volume_[A-Za-z]+|Media_[A-Za-z_]+|Launch_[A-Za-z0-9]+)$")
-            throw Error("不支持此键名。请点击录制按键并按一个键盘键。")
+        if StrLen(key) > 40 || InStr(key, "::") || RegExMatch(key, "[\r\n\t]")
+            throw Error("请录制一个键；不支持组合键表达式或脚本。")
         vk := GetKeyVK(key), sc := GetKeySC(key)
     }
     return KeySpecFromCodes(vk, sc)
@@ -117,17 +116,19 @@ KeySymbols(vk, sc) {
 
 KeyOccupancyWarning(spec) {
     if spec.Mouse
-        return "程序运行期间，此鼠标键被全局占用，前进/后退或中键原功能不会同时执行；按住只触发一次 Win+H。设置中恢复原功能，退出程序后解除占用。只支持单键，不支持组合键。"
+        return "运行时会占用此键的原点击、前进/后退或滚动功能。设置窗口中暂停映射；Ctrl+Alt+Shift+F12 可暂停并打开设置，恢复默认后保存。退出程序恢复原功能。"
     if spec.Modifier
-        return "Shift 原功能保留，独立按下并松开时全局触发 Win+H；组合键不触发。Windows 语音面板控制录音。退出本程序后解除映射。"
-    return "程序运行期间，此键在所有窗口的字符或原功能会被语音快捷键占用，按住只触发一次；设置中暂停映射。退出后恢复原功能。请确认你接受全局占用。"
+        return "修饰键保留原组合键功能，仅独立按下并松开时触发。Win/Alt 的系统行为也可能出现。Ctrl+Alt+Shift+F12 可暂停并打开设置；退出恢复。"
+    return "运行时会占用此键的打字或原功能，长按仅触发一次。设置中暂停；Ctrl+Alt+Shift+F12 可暂停并打开设置，恢复默认后保存。Fn、硬件和系统安全键不保证可捕获。"
 }
 
 MouseKeySpec(key) {
-    static specs := Map("MButton", [4, "鼠标中键"], "XButton1", [5, "鼠标侧键 1（后退）"], "XButton2", [6, "鼠标侧键 2（前进）"])
+    static specs := Map("LButton", [1, "鼠标左键"], "RButton", [2, "鼠标右键"],
+        "MButton", [4, "鼠标中键"], "XButton1", [5, "鼠标侧键 1（后退）"], "XButton2", [6, "鼠标侧键 2（前进）"],
+        "WheelUp", [256, "滚轮向上"], "WheelDown", [257, "滚轮向下"], "WheelLeft", [258, "横滚向左"], "WheelRight", [259, "横滚向右"])
     if !specs.Has(key)
-        throw Error("仅支持鼠标中键、XButton1 和 XButton2；左/右键保留用于设置和退出。")
+        throw Error("不支持的鼠标单键或滚轮方向。")
     item := specs[key]
     return {Key: key, VK: item[1], SC: 0, Name: key, Modifier: false, Mouse: true,
-        Allowed: true, Reason: "", Label: item[2] "（" key "）"}
+        Pulse: item[1] >= 256, Wheel: item[1] >= 256, Allowed: true, Reason: "", Label: item[2] "（" key "）"}
 }

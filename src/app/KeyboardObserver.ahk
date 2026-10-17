@@ -1,181 +1,191 @@
 ﻿#Include MouseObserver.ahk
-; Native hook observes only the configured key; during an explicitly armed
-; recorder it retains one VK/SC, and during a modifier tap only a combo boolean.
-; No strings, characters, key history, or unrelated key identities are stored.
 global KeyboardObserverHandle := 0, KeyboardObserverCallback := 0
-global BindingSpec := 0, SelectedPhysicalDown := false, SelectedEventInjected := true
-global SelectedOtherKey := false, ModifierPending := 0
-global RecordingActive := false, RecordHeldVK := 0, RecordHeldSC := 0
-global RecordHeldNative := false, RecordedCombination := false
-global RecordedSpec := 0, RecordExpiry := 0, RecordDisplay := 0, RecordButton := 0
-global RecordingPendingVK := 0, RecordingPendingSC := 0
-global RecordingTarget := "open"
+global RecordingActive := false, RecordHeldVK := 0, RecordHeldSC := 0, RecordHeldMouse := false
+global RecordHeldNative := false, RecordedCombination := false, RecordingCancelled := false
+global RecordedSpec := 0, RecordExpiry := 0, RecordDisplay := 0, RecordButton := 0, RecordCaptureControl := 0
+global RecordingPendingVK := 0, RecordingPendingSC := 0, RecordingPendingMouse := false
+global RecordingTarget := "open", RecordingGeneration := 1
 
-StartKeyboardObserver(spec) {
-    global BindingSpec, SelectedPhysicalDown, SelectedEventInjected
+StartKeyboardObserver(*) {
     global KeyboardObserverHandle, KeyboardObserverCallback
     if KeyboardObserverHandle
-        DllCall("UnhookWindowsHookEx", "Ptr", KeyboardObserverHandle)
-    KeyboardObserverHandle := 0
-    if !KeyboardObserverCallback
-        KeyboardObserverCallback := CallbackCreate(KeyboardObserverProc, "Fast", 3)
-    BindingSpec := spec
-    StartMouseObserver()
-    SelectedPhysicalDown := false, SelectedEventInjected := true
+        return
+    KeyboardObserverCallback := CallbackCreate(KeyboardObserverProc, "Fast", 3)
     KeyboardObserverHandle := DllCall("SetWindowsHookExW", "Int", 13, "Ptr", KeyboardObserverCallback,
         "Ptr", DllCall("GetModuleHandleW", "Ptr", 0, "Ptr"), "UInt", 0, "Ptr")
     if !KeyboardObserverHandle
         throw OSError()
+    StartMouseObserver()
 }
-
 KeyboardObserverProc(code, message, pointer) {
-    global SelectedPhysicalDown, SelectedEventInjected, SelectedOtherKey, RecordingActive
     if code >= 0 {
         try {
             event := DecodeKeyboardEvent(message, pointer)
             if ObserveKeyboardMetadata(event.VK, event.SC, event.Down, event.Injected)
                 return 1
         } catch {
-            ; Never suppress an unknown event on a hook error.
-            SelectedPhysicalDown := false, SelectedEventInjected := true
-            SelectedOtherKey := true, RecordingActive := false
+            ; Unknown input remains native; recording is disarmed on an unexpected hook error.
+            global RecordingActive
+            RecordingActive := false
         }
     }
     return DllCall("CallNextHookEx", "Ptr", 0, "Int", code, "Ptr", message, "Ptr", pointer, "Ptr")
 }
-
 DecodeKeyboardEvent(message, pointer) {
-    flags := NumGet(pointer, 8, "UInt")
-    vk := NumGet(pointer, 0, "UInt"), rawSC := NumGet(pointer, 4, "UInt")
-    if vk = 0x10 {
-        if (rawSC & 0xFF) = 0x2A
-            vk := 0xA0
-        else if (rawSC & 0xFF) = 0x36
-            vk := 0xA1
-    }
-    return {VK: vk, SC: rawSC | (flags & 1 ? 0x100 : 0),
-        Down: message = 0x100 || message = 0x104, Injected: !!(flags & 0x12)}
+    flags := NumGet(pointer, 8, "UInt"), vk := NumGet(pointer, 0, "UInt"), rawSC := NumGet(pointer, 4, "UInt")
+    if vk = 0x10
+        vk := (rawSC & 0xFF) = 0x36 ? 0xA1 : 0xA0
+    else if vk = 0x11
+        vk := flags & 1 ? 0xA3 : 0xA2
+    else if vk = 0x12
+        vk := flags & 1 ? 0xA5 : 0xA4
+    return {VK: vk, SC: rawSC | (flags & 1 ? 0x100 : 0), Down: message = 0x100 || message = 0x104, Injected: !!(flags & 0x12)}
 }
-
-ObserveKeyboardMetadata(vk, sc, down, injected) {
-    global BindingSpec, SelectedPhysicalDown, SelectedEventInjected, SelectedOtherKey
-    global RecordingActive, RecordHeldVK, RecordHeldSC, RecordHeldNative, RecordedCombination, RecordExpiry, SettingsOpen, SettingsWindow
-    global RecordingPendingVK, RecordingPendingSC
-    ; Finish the exact recorded press, including repeats/up, even after cancel.
-    if !injected && RecordHeldVK && vk = RecordHeldVK && sc = RecordHeldSC {
-        suppressed := !RecordHeldNative
-        if !down
-            RecordHeldVK := 0, RecordHeldSC := 0, RecordHeldNative := false
-        return suppressed
+OtherPhysicalKeyDown(selectedVK) {
+    Loop 247 {
+        vk := A_Index + 7
+        if vk = selectedVK || (vk = 0x10 && selectedVK >= 0xA0 && selectedVK <= 0xA1)
+            || (vk = 0x11 && selectedVK >= 0xA2 && selectedVK <= 0xA3)
+            || (vk = 0x12 && selectedVK >= 0xA4 && selectedVK <= 0xA5)
+            continue
+        if DllCall("GetAsyncKeyState", "Int", vk, "Short") & 0x8000
+            return true
     }
-    if !injected && down && RecordHeldVK {
-        RecordedCombination := true
-        DllCall("PostMessageW", "Ptr", A_ScriptHwnd, "UInt", 0x8056, "Ptr", 0, "Ptr", 0)
-    }
-    if RecordingActive && !injected && down {
-        if A_TickCount >= RecordExpiry || !SettingsOpen || !IsObject(SettingsWindow)
-            || DllCall("GetForegroundWindow", "Ptr") != SettingsWindow.Hwnd {
-            RecordingActive := false
-            return false
-        }
-        if vk >= 8 && vk <= 254 {
-            RecordingActive := false
-            RecordHeldVK := vk, RecordHeldSC := sc
-            ; Never suppress a modifier while recording: retain all native
-            ; modifier combinations, including Windows security shortcuts.
-            RecordHeldNative := vk = 0x10 || vk = 0x11 || vk = 0x12 || vk = 0x5B || vk = 0x5C || (vk >= 0xA0 && vk <= 0xA5)
-            RecordedCombination := false
-            RecordingPendingVK := vk, RecordingPendingSC := sc
-            ; Resolve names/update controls outside the low-level callback.
-            DllCall("PostMessageW", "Ptr", A_ScriptHwnd, "UInt", 0x8055, "Ptr", 0, "Ptr", 0)
-            return !RecordHeldNative
-        }
-    }
-    if !IsObject(BindingSpec)
-        return false
-    matched := !BindingSpec.Mouse && (BindingSpec.Modifier ? vk = BindingSpec.VK : BindingSpec.SC ? sc = BindingSpec.SC : vk = BindingSpec.VK)
-    if matched {
-        SelectedEventInjected := injected
-        if !injected {
-            if down && !SelectedPhysicalDown
-                SelectedOtherKey := false
-            SelectedPhysicalDown := down
-        }
-    } else if down && SelectedPhysicalDown && BindingSpec.Modifier
-        SelectedOtherKey := true
     return false
 }
-
+ObserveKeyboardMetadata(vk, sc, down, injected) {
+    global InputState, SettingsOpen, RecoveryPaused
+    if !IsObject(InputState)
+        return false
+    modifier := (vk >= 0xA0 && vk <= 0xA5) || vk = 0x5B || vk = 0x5C
+    other := !injected && modifier && InputState.Role(vk, sc, false) ? OtherPhysicalKeyDown(vk) : false
+    pulse := vk = 0x13 || vk = 3 || vk = 0x2C
+    event := InputState.Handle(vk, sc, down, injected, A_TickCount, SettingsOpen || RecoveryPaused, false, pulse, other)
+    captured := ObserveRecording(vk, sc, down, injected, false, pulse)
+    if event.Action
+        QueueBoundAction(event.Action, event.Generation)
+    return event.Consume || captured
+}
+RecorderMouseAreaAllowed() {
+    global RecordCaptureControl, SettingsWindow
+    if !IsObject(RecordCaptureControl) || !IsObject(SettingsWindow)
+        return false
+    point := Buffer(8)
+    if !DllCall("GetCursorPos", "Ptr", point)
+        return false
+    hwnd := DllCall("WindowFromPoint", "Int64", NumGet(point, 0, "Int64"), "Ptr")
+    ; WindowFromPoint may skip a Static control. Use its actual bounds and our own GUI ancestry.
+    if hwnd != SettingsWindow.Hwnd && !DllCall("IsChild", "Ptr", SettingsWindow.Hwnd, "Ptr", hwnd)
+        return false
+    rect := Buffer(16)
+    return DllCall("GetWindowRect", "Ptr", RecordCaptureControl.Hwnd, "Ptr", rect)
+        && RecorderPointInside(NumGet(point,0,"Int"),NumGet(point,4,"Int"),
+            NumGet(rect,0,"Int"),NumGet(rect,4,"Int"),NumGet(rect,8,"Int"),NumGet(rect,12,"Int"))
+}
+RecorderPointInside(x,y,left,top,right,bottom) => x >= left && y >= top && x < right && y < bottom
+RecorderMayCapture(active, down, withinTime, settings, focused, mouse, captureArea) =>
+    active && down && withinTime && settings && focused && (!mouse || captureArea)
+RecorderExitKey(vk, mouse) => !mouse && vk = 0x1B
+ObserveRecording(vk, sc, down, injected, mouse, pulse) {
+    global RecordingActive, RecordHeldVK, RecordHeldSC, RecordHeldMouse, RecordHeldNative, RecordedCombination
+    global RecordingCancelled, RecordExpiry, SettingsOpen, SettingsWindow, RecordingGeneration
+    global RecordingPendingVK, RecordingPendingSC, RecordingPendingMouse, InputState
+    if injected
+        return false
+    ; Escape always reaches the GUI: stop recording first, then cancel settings.
+    if RecorderExitKey(vk, mouse)
+        return false
+    if RecordHeldVK && vk = RecordHeldVK && sc = RecordHeldSC && mouse = RecordHeldMouse {
+        consume := !RecordHeldNative
+        if !down {
+            RecordHeldVK := 0
+            if !RecordingCancelled
+                DllCall("PostMessageW", "Ptr", A_ScriptHwnd, "UInt", RecordedCombination ? 0x8056 : 0x8055, "Ptr", RecordingGeneration, "Ptr", 0)
+        }
+        return consume
+    }
+    if down && RecordHeldVK {
+        RecordedCombination := true
+        return false
+    }
+    if !RecordingActive || !down
+        return false
+    if A_TickCount >= RecordExpiry || !SettingsOpen || !IsObject(SettingsWindow)
+        || DllCall("GetForegroundWindow", "Ptr") != SettingsWindow.Hwnd {
+        RecordingActive := false
+        return false
+    }
+    ; Save/cancel/close and the record buttons always remain native mouse targets.
+    if !RecorderMayCapture(RecordingActive, down, A_TickCount < RecordExpiry, SettingsOpen, true, mouse, mouse ? RecorderMouseAreaAllowed() : false)
+        return false
+    RecordingActive := false, RecordingCancelled := false
+    RecordHeldVK := pulse ? 0 : vk, RecordHeldSC := sc, RecordHeldMouse := mouse
+    RecordHeldNative := !mouse && ((vk >= 0xA0 && vk <= 0xA5) || vk = 0x5B || vk = 0x5C)
+    RecordedCombination := InputState.OtherModifiers(RecordHeldNative ? vk : 0)
+    RecordingPendingVK := vk, RecordingPendingSC := sc, RecordingPendingMouse := mouse
+    if pulse
+        DllCall("PostMessageW", "Ptr", A_ScriptHwnd, "UInt", RecordedCombination ? 0x8056 : 0x8055, "Ptr", RecordingGeneration, "Ptr", 0)
+    return !RecordHeldNative
+}
 BeginKeyRecording(*) {
-    global SettingsOpen, SettingsWindow, RecordingActive, RecordExpiry, RecordedSpec, RecordDisplay, RecordButton
-    global RecordHeldVK
+    global SettingsOpen, RecordingActive, RecordExpiry, RecordedSpec, RecordDisplay, RecordButton
+    global RecordHeldVK, RecordingGeneration, RecordingCancelled
     if !SettingsOpen || RecordHeldVK
         return
     CancelKeyRecording()
-    RecordedSpec := 0
-    RecordDisplay.Text := "请在 10 秒内按一个键盘键、鼠标中键或侧键，然后松开。左/右鼠标键不录制。"
-    RecordButton.Text := "重新录制按键"
-    RecordingActive := true
-    RecordExpiry := A_TickCount + 10000
+    RecordingGeneration += 1, RecordingCancelled := false
+    RecordedSpec := 0, RecordingActive := true, RecordExpiry := A_TickCount + 10000
+    RecordDisplay.Text := (RecordingTarget = "close" ? "正在录制关闭键" : "正在录制打开键") "：按下后松开。鼠标请在大区域内操作；Esc 停止。"
     SetTimer(RecordingTimeout, -10000)
     SetTimer(RecorderWatch, 100)
 }
-
-RecordingCompleted(*) {
-    global RecordingPendingVK, RecordingPendingSC, SettingsOpen, RecordedSpec, RecordDisplay
-    global RecordingTarget
-    SetTimer(RecordingTimeout, 0)
-    SetTimer(RecorderWatch, 0)
-    vk := RecordingPendingVK, sc := RecordingPendingSC
-    RecordingPendingVK := 0, RecordingPendingSC := 0
-    if !SettingsOpen || !vk
+RecordingCompleted(generation := 0, *) {
+    global RecordingGeneration, RecordingPendingVK, RecordingPendingSC, RecordingPendingMouse
+    global SettingsOpen, RecordedSpec, RecordDisplay, RecordingTarget, ProposedTriggerSpec, ProposedCloseSpec
+    if generation != RecordingGeneration || !SettingsOpen
         return
+    SetTimer(RecordingTimeout, 0), SetTimer(RecorderWatch, 0)
     try {
-        spec := vk >= 4 && vk <= 6 && sc = 0 ? MouseKeySpec(vk = 4 ? "MButton" : vk = 5 ? "XButton1" : "XButton2") : KeySpecFromCodes(vk, sc)
-        if RecordingTarget = "close" && !spec.Mouse
-            spec.Allowed := false, spec.Reason := "关闭键仅支持鼠标中键、XButton1 或 XButton2；请重新录制。"
+        spec := RecordingPendingMouse ? MouseSpecFromVK(RecordingPendingVK) : KeySpecFromCodes(RecordingPendingVK, RecordingPendingSC)
         RecordedSpec := spec
-        RecordDisplay.Text := spec.Label "`n" (spec.Allowed ? KeyOccupancyWarning(spec) : spec.Reason)
+        if RecordingTarget = "close"
+            ProposedCloseSpec := spec
+        else
+            ProposedTriggerSpec := spec
+        UpdateSettingLabels()
+        RecordDisplay.Text := "已选：" SettingsKeyLabel(spec) "。保存后生效。`n"
+            . (spec.Modifier ? "独立按下松开才触发，原组合键保留。" : "启用后占用此键原功能；取消不生效。")
     } catch as problem {
-        RecordedSpec := 0
-        RecordDisplay.Text := problem.Message
+        RecordedSpec := 0, RecordDisplay.Text := problem.Message
     }
 }
-
 CancelKeyRecording(*) {
-    global RecordingActive, RecordingPendingVK, RecordingPendingSC
-    RecordingActive := false
+    global RecordingActive, RecordingPendingVK, RecordingPendingSC, RecordingCancelled, RecordingGeneration
+    RecordingActive := false, RecordingCancelled := true, RecordingGeneration += 1
     RecordingPendingVK := 0, RecordingPendingSC := 0
-    SetTimer(RecordingTimeout, 0)
-    SetTimer(RecorderWatch, 0)
+    SetTimer(RecordingTimeout, 0), SetTimer(RecorderWatch, 0)
 }
-
 RecordingTimeout(*) {
-    global RecordingActive, SettingsOpen, RecordDisplay
-    RecordingActive := false
-    SetTimer(RecorderWatch, 0)
+    global SettingsOpen, RecordDisplay
+    CancelKeyRecording()
     if SettingsOpen
-        RecordDisplay.Text := "录制已超时。请重新录制清单内的一个物理单键，或取消。"
+        RecordDisplay.Text := "录制超时；可以重新录制、恢复默认或取消。"
 }
-
 RecorderWatch(*) {
     global RecordingActive, SettingsOpen, SettingsWindow, RecordDisplay
-    if RecordingActive && (!SettingsOpen || !IsObject(SettingsWindow)
-        || DllCall("GetForegroundWindow", "Ptr") != SettingsWindow.Hwnd) {
+    if RecordingActive && (!SettingsOpen || !IsObject(SettingsWindow) || DllCall("GetForegroundWindow", "Ptr") != SettingsWindow.Hwnd) {
         CancelKeyRecording()
         if SettingsOpen
-            RecordDisplay.Text := "设置窗口失去焦点，录制已停止。"
+            RecordDisplay.Text := "设置窗口失去焦点，已停止录制。"
     }
 }
-
-RecordingCombinationDetected(*) {
-    global SettingsOpen, RecordedCombination, RecordedSpec, RecordDisplay
-    if SettingsOpen && RecordedCombination {
+RecordingCombinationDetected(generation := 0, *) {
+    global SettingsOpen, RecordingGeneration, RecordedSpec, RecordDisplay
+    if SettingsOpen && generation = RecordingGeneration {
         RecordedSpec := 0
-        RecordDisplay.Text := "检测到组合键。加号/括号等由 Shift 与其他键组成；请选择对应数字/符号键，或只录制 Shift 单键。请松开后重新录制。"
+        RecordDisplay.Text := "检测到组合输入；本版只绑定单键。松开后重新录制，保存/取消保持可用。"
     }
 }
-
 StopKeyboardObserver(*) {
     global KeyboardObserverHandle, KeyboardObserverCallback
     CancelKeyRecording()

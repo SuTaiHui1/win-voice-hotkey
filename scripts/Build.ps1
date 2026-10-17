@@ -35,11 +35,11 @@ foreach ($file in 'README.md','CHANGELOG.md','THIRD_PARTY_NOTICES.md','LICENSE')
 }
 Copy-Item -Recurse -LiteralPath (Join-Path $root 'docs') -Destination $package
 New-Item -ItemType File -Path (Join-Path $package 'portable.flag') | Out-Null
-$version = '0.1.1'
+$version = '0.1.2'
 $portable = Join-Path $out "win-voice-hotkey-$version-windows-x64-portable.zip"
 [IO.Compression.ZipFile]::CreateFromDirectory($package,$portable,[IO.Compression.CompressionLevel]::Optimal,$false)
 $installer = Join-Path $out "win-voice-hotkey-$version-windows-x64-setup.exe"
-Compile @('/nologo','/target:winexe','/platform:x64','/optimize+','/debug-','/reference:System.Windows.Forms.dll','/reference:System.IO.Compression.dll','/reference:System.IO.Compression.FileSystem.dll',('/resource:'+$portable+',payload.zip'),('/out:'+$installer),(Join-Path $root 'src\host\Installer.cs'))
+Compile @('/nologo','/target:winexe','/platform:x64','/optimize+','/debug-','/reference:System.Windows.Forms.dll','/reference:System.IO.Compression.dll','/reference:System.IO.Compression.FileSystem.dll',('/resource:'+$portable+',payload.zip'),('/out:'+$installer),'/main:Installer',(Join-Path $root 'src\host\Launcher.cs'),(Join-Path $root 'src\host\Installer.cs'))
 $sources = Join-Path $out "win-voice-hotkey-$version-source.zip"
 $sourceStage = Join-Path $out 'source'
 New-Item -ItemType Directory -Path $sourceStage | Out-Null

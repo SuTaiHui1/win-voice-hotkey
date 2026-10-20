@@ -37,7 +37,7 @@ internal static class Installer {
         try {
             // Never trust the old launcher's exit code: v0.1.1 can report zero while still running.
             // Compile the fixed launcher's retained-handle/token verification into this installer too.
-            code=Launcher.StopAndConfirm(Launcher.Data(folder));
+            code=Launcher.StopAndConfirm(Launcher.Data(folder),folder);
         } catch(Exception error){throw new StopFailure(2,"无法完成停止检查："+error.Message+"。"+retry);}
         if(code!=0)throw new StopFailure(code==3?3:2,
             (code==3?"旧实例退出超时。":"旧实例校验或停止失败（退出码 "+code+"）。")+retry);
@@ -73,7 +73,7 @@ internal static class Installer {
             }
         }
         File.Delete(Path.Combine(folder,"portable.flag"));
-        File.WriteAllText(Path.Combine(folder,Marker),"WinVoiceHotkey 0.1.2\n");
+        File.WriteAllText(Path.Combine(folder,Marker),"WinVoiceHotkey 0.1.3\n");
         File.Copy(Assembly.GetExecutingAssembly().Location,Path.Combine(folder,"Uninstall.exe"),upgrade);
         installed.Add("Uninstall.exe");installed.Add(Marker);
         File.WriteAllLines(Path.Combine(folder,"install-files.txt"),installed.ToArray());

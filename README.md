@@ -2,18 +2,18 @@
 
 **把 Windows 语音输入放到顺手的一颗按键上。**
 
-版本 **0.1.2**，面向 Windows 11 x64。默认鼠标后退侧键（XButton1）打开 Win+H，前进侧键（XButton2）真正关闭语音面板。可以更换键盘单键、鼠标键或滚轮，也可以用同一个键切换打开和关闭。
+版本 **0.1.3**，面向 Windows 11 x64。默认鼠标后退侧键（XButton1）打开 Win+H，前进侧键（XButton2）真正关闭语音面板。可以更换键盘单键、鼠标键或滚轮，也可以用同一个键切换打开和关闭。
 
 ## 下载与开始
 
-从 [v0.1.2 Release](https://github.com/SuTaiHui1/win-voice-hotkey/releases/tag/v0.1.2) 选择：
+从 [v0.1.3 Release](https://github.com/SuTaiHui1/win-voice-hotkey/releases/tag/v0.1.3) 选择：
 
 | 文件 | 用途 |
 | --- | --- |
-| [安装程序](https://github.com/SuTaiHui1/win-voice-hotkey/releases/download/v0.1.2/win-voice-hotkey-0.1.2-windows-x64-setup.exe) | 按当前用户安装或升级 |
-| [便携包](https://github.com/SuTaiHui1/win-voice-hotkey/releases/download/v0.1.2/win-voice-hotkey-0.1.2-windows-x64-portable.zip) | 完整解压到可写目录，运行 WinVoiceHotkey.exe |
-| [源码包](https://github.com/SuTaiHui1/win-voice-hotkey/releases/download/v0.1.2/win-voice-hotkey-0.1.2-source.zip) | 可读源码、构建和测试脚本 |
-| [SHA256SUMS.txt](https://github.com/SuTaiHui1/win-voice-hotkey/releases/download/v0.1.2/SHA256SUMS.txt) | 上述三个文件的校验值 |
+| [安装程序](https://github.com/SuTaiHui1/win-voice-hotkey/releases/download/v0.1.3/win-voice-hotkey-0.1.3-windows-x64-setup.exe) | 按当前用户安装或升级 |
+| [便携包](https://github.com/SuTaiHui1/win-voice-hotkey/releases/download/v0.1.3/win-voice-hotkey-0.1.3-windows-x64-portable.zip) | 完整解压到可写目录，运行 WinVoiceHotkey.exe |
+| [源码包](https://github.com/SuTaiHui1/win-voice-hotkey/releases/download/v0.1.3/win-voice-hotkey-0.1.3-source.zip) | 可读源码、构建和测试脚本 |
+| [SHA256SUMS.txt](https://github.com/SuTaiHui1/win-voice-hotkey/releases/download/v0.1.3/SHA256SUMS.txt) | 上述三个文件的校验值 |
 
 二进制包已包含固定版本 AutoHotkey，不用另装 Python、AutoHotkey 或开发工具。需要 Windows 自带 .NET Framework 4.x。Code → Download ZIP 是开发源码，不是可运行发行包。
 
@@ -25,7 +25,7 @@
 程序、代理和安装包**未签名**。请核对仓库地址和校验和，按设备策略处理安全提示；不要关闭安全保护或绕过组织策略。校验和证明文件一致，不等同于发布者身份签名。
 
 ```powershell
-Get-FileHash .\win-voice-hotkey-0.1.2-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\win-voice-hotkey-0.1.3-windows-x64-setup.exe -Algorithm SHA256
 ```
 
 ## 设置方法
@@ -62,7 +62,7 @@ Get-FileHash .\win-voice-hotkey-0.1.2-windows-x64-setup.exe -Algorithm SHA256
 
 自启默认关闭。托盘“开机自启”切换当前用户启动文件夹快捷方式；不注册系统服务、任务计划或更改系统权限。
 
-安装程序支持带本项目标记和清单的旧安装目录原地升级，并保留用户配置和无关文件。正常退出核验失败或超时会停止，校验失败为退出码 2，超时为 3；无标记的非空目录拒绝覆盖。**如果状态显示旧 PID 或 Running=0，但托盘/进程仍在，请先从托盘退出并确认进程已消失，再升级/卸载。** 已知状态陈旧场景尚未查明，不能只凭 --stop 返回 0 认定进程已退出。
+安装程序支持带本项目标记和清单的旧安装目录原地升级，并保留用户配置和无关文件。正常退出核验失败或超时会停止，校验失败为退出码 2，超时为 3；无标记的非空目录拒绝覆盖。停止命令同时核对当前会话、程序路径、窗口及实例标识；记录 PID 已失效时会寻找本安装自己的实际实例。校验失败时先从托盘正常退出并确认进程消失，再升级/卸载。
 
 便携升级推荐解压到新目录；退出旧版后，只复制自己的 `data/config.ini`，不复制状态或诊断文件。安装版从开始菜单卸载，保留配置。运行中的 Uninstall.exe 可能留在目录，关闭后可自行删除；不要删除其他程序或目录。便携版先取消自启、从托盘退出，再删除解压目录。
 
@@ -70,9 +70,9 @@ Get-FileHash .\win-voice-hotkey-0.1.2-windows-x64-setup.exe -Algorithm SHA256
 
 Windows 11 x64、可用 Win+H、麦克风及相应语音语言。Windows 10、ARM64、远程桌面、受保护桌面、锁屏、管理员应用、多用户和各类驱动未完成兼容验证。Windows 更新可能改变面板结构。
 
-本版包含退出互斥锁回调、停止等待、安装器停止门禁、真实面板候选查找和设置易用性修复。自动检查覆盖输入路由、同键状态、保存回滚、录制安全和布局，未调用实际语音服务。此前隔离环境的退出/安装回归是历史基线，未在本次启用沙盒重跑。
+本版增加带读回核验的原子状态快照、完整就绪判断、统一退出记录和有界生命周期日志，并避免驻留子进程继承调用者的输出管道。保留现有按键、真实面板关闭和设置行为。自动检查覆盖输入路由、状态持久化、启动/停止、保存回滚、录制安全和布局，未调用实际语音服务。
 
-**已知未解决项**：曾在一次登录后观察到程序进程已启动，但状态文件仍为旧 PID/Running=0；正常退出并启动一次后恢复，原因未复现或查明。不宣称已修复此问题，也不把进程存在当作就绪证明。所有物理键鼠、不同 DPI/Windows 构建和最终视觉均未逐一实测。见[验证范围](docs/TESTING.md)。
+**真实登录核对**：在一台 Windows 11 x64 主机完整重启、自然登录后，已核实新实例的启动记录、代理就绪及真实状态快照。此前“登录后旧状态”的报告经核实为检查工具读到了打包应用私有缓存中的旧副本，不能继续列作本次仍存在的产品缺陷。检查时需要区分实际文件目标与相同的路径文字；进程存在本身也不等于就绪。尚未验证所有设备、Windows 构建、长时稳定性和最终视觉，见[验证范围](docs/TESTING.md)。
 
 ## 隐私
 
@@ -80,13 +80,13 @@ Windows 11 x64、可用 Win+H、麦克风及相应语音语言。Windows 10、AR
 
 Windows 语音输入使用 Microsoft 在线识别，网络、麦克风和语音隐私设置由 Windows 管理；本工具不能把它变成离线，也不能替用户授权。[Microsoft 说明](https://support.microsoft.com/en-us/accessibility/windows/use-voice-typing-to-talk-instead-of-type-on-your-pc)
 
-可选进程级支持诊断会保存有限的键名、配置路径、面板元数据和探测结果，不包含文本或音频；默认关闭、无上传。分享前请移除个人路径和运行信息。[隐私说明](docs/PRIVACY.md)
+默认的 `lifecycle.log` 仅记录启动、就绪、退出与状态发布错误，有大小上限；不记录按键历史、文本或音频。可选进程级支持诊断会保存有限的键名、配置路径、面板元数据和探测结果，不包含文本或音频；默认关闭、无上传。分享前请移除个人路径和运行信息。[隐私说明](docs/PRIVACY.md)
 
 ## 排查与开发
 
-无反应时确认托盘程序在运行、设置窗口已关闭，并先检查系统 Win+H；不要同时运行其他键位映射。能打开但不能关闭时，可从托盘查看状态或手动点击系统面板 X。状态陈旧时按上文先退出再启动，不要反复启动多个副本。
+无反应时确认托盘程序在运行、设置窗口已关闭，并先检查系统 Win+H；不要同时运行其他键位映射。能打开但不能关闭时，可从托盘查看状态或手动点击系统面板 X。状态不一致时先核对是否在同一用户和文件视图中读取；仍无法确认则从托盘正常退出，不要反复启动多个副本。
 
-可运行 `WinVoiceHotkey.exe --settings` 打开设置；`--stop` 只向具有本工具实例属性的目标发出退出请求并等待，无法据陈旧记录证明所有实例均已停止。配置损坏时，先退出程序，备份并重命名自己的 config.ini，再启动生成默认配置。
+可运行 `WinVoiceHotkey.exe --settings` 打开设置；`--stop` 核验本安装的实际实例，发出正常退出请求并等待；身份不明确或等待超时时返回失败，不继续升级或卸载。配置损坏时，先退出程序，备份并重命名自己的 config.ini，再启动生成默认配置。
 
 ```powershell
 .\scripts\Build.ps1

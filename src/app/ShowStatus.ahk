@@ -1,26 +1,32 @@
 ﻿#Requires AutoHotkey v2.0
-#Include AppPaths.ahk
+#Include RuntimeState.ahk
 #Include KeyCatalog.ahk
+; A read-only status viewer must not acquire the application's single-instance mutex.
+DataDir := EnvGet("WIN_VOICE_HOTKEY_DATA_DIR")
+if DataDir = ""
+    DataDir := A_AppData "\WinVoiceHotkey"
 state := DataDir "\mapping-state.ini"
-pid := IniRead(state, "State", "PID", "0")
-window := IniRead(state, "State", "HWND", "0")
-token := IniRead(state, "State", "InstanceToken", "0")
+values := Map()
+try values := ParseRuntimeState(ReadRuntimeFile(state))
+pid := values.Get("PID","0")
+window := values.Get("HWND","0")
+token := values.Get("InstanceToken","0")
 windowPid := 0
 if window != "0"
     DllCall("GetWindowThreadProcessId", "Ptr", window, "UInt*", &windowPid)
-running := IniRead(state, "State", "Running", "0") = "1" && pid != "0" && ProcessExist(pid)
+running := values.Get("Running","0") = "1" && values.Get("Ready","0") = "1" && pid != "0" && ProcessExist(pid)
     && windowPid = pid && token != "0"
     && DllCall("GetPropW", "Ptr", window, "WStr", "WinVoiceHotkeyInstance", "Ptr") = token
-mode := IniRead(state, "State", "Mode", "stopped")
-key := IniRead(state, "State", "Key", "CapsLock")
+mode := values.Get("Mode","stopped")
+key := values.Get("Key","XButton1")
 try key := ResolveKeySpec(key).Label
 message := running ? (mode = "global_voice_mapping" ? "全局语音映射正在运行，无需输入框判断。独立按键触发 Win+H，设置中暂停，退出后解除映射。" : "安全诊断正在运行，不调用语音。") : "已停止，没有运行中的映射。"
-closeKey := IniRead(state, "State", "CloseKey", "")
+closeKey := values.Get("CloseKey","")
 closeLabel := "未设置"
 if closeKey != "" {
     try closeLabel := ResolveKeySpec(closeKey).Label
 }
-closeResult := IniRead(state, "State", "CloseResult", "not_requested")
+closeResult := values.Get("CloseResult","not_requested")
 statusLabels := Map("not_requested", "尚未请求关闭", "closed_verified", "面板已确认消失", "panel_absent", "没有可识别的语音面板，未操作", "identity_unknown", "面板身份未确认，未操作", "button_missing", "未找到可靠关闭按钮，未操作", "close_not_verified", "已请求关闭，但未确认面板消失", "helper_timeout_no_other_action", "关闭检查超时，未操作其他窗口", "pending", "正在检查语音面板")
 statusLabels["closed"] := "语音面板已关闭"
 statusLabels["no_verified_panel"] := "未识别到语音面板，未执行关闭"

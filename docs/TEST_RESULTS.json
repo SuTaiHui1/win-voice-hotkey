@@ -1,77 +1,32 @@
 {
-  "version": "0.1.2",
-  "date": "2026-10-17",
+  "version": "0.1.3",
+  "date": "2026-10-20",
   "currentSource": {
-    "ahk": {
-      "passed": 1539,
-      "global_hooks_installed": false,
-      "microphone_used": false,
-      "WinH_sent": false,
-      "real_UIA_invoked": false
-    },
-    "desktop": "Dedicated invisible test desktop; never switched",
-    "panelCore": {
-      "passed": 8,
-      "real_UIA_invoked": false,
-      "microphone_used": false
-    },
-    "scope": "No voice input, microphone, global hooks, real UIA invoke, or production configuration changes"
+    "voiceOrMicrophoneOrRealUIAUsed": false,
+    "lifecycle": 13,
+    "productionConfigurationChanged": false,
+    "panelCore": 8,
+    "binding": 1539,
+    "runtimeState": 21
   },
-  "settings": {
-    "evidence": "Application own hidden GUI control bounds; not a screenshot",
-    "sizes": [
-      [
-        360,
-        320
-      ],
-      [
-        360,
-        400
-      ],
-      [
-        420,
-        480
-      ],
-      [
-        640,
-        640
-      ],
-      [
-        900,
-        720
-      ]
-    ],
-    "localDpi": 144,
-    "visualAcceptance": false
+  "naturalLogin": {
+    "brokerReady": true,
+    "singleWindows11x64Machine": true,
+    "newLifecycleRecordsVerified": true,
+    "actualProcessAndSnapshotMatched": true,
+    "allDevicesOrLongTermReliabilityValidated": false,
+    "completeKernelRestart": true,
+    "priorStaleStateReport": "Corrected: inspection context read a packaged-app private cache copy; actual host files contained current state."
   },
+  "publication": {
+    "dailyInstanceRestartedForRelease": false,
+    "versionMetadataUpdated": true,
+    "sameBusinessLogicAsValidatedDailyBuild": true
+  },
+  "settingsFinalVisualAcceptance": false,
   "historicalRegression": {
     "stopAndLifecycle": 32,
     "installerStopGate": 93,
     "rerunThisRelease": false
-  },
-  "physicalAcceptance": {
-    "xButton2TrueClose": true,
-    "rightShiftSameKey": true,
-    "recordingSpecificRetest": false,
-    "allDevicesTested": false,
-    "manualCloseThenReopen": true,
-    "singleMachine": true
-  },
-  "knownIssues": [
-    "One login produced stale runtime state; normal restart recovered; cause not established.",
-    "Latest settings final visual acceptance unavailable."
-  ],
-  "liveDailyApplicationChangedForRelease": false,
-  "localPackaging": {
-    "isolatedInstall": true,
-    "noInputSmoke": true,
-    "settingsOpenedClosed": true,
-    "brokerReady": true,
-    "isolatedStartupShortcutRoundtrip": true,
-    "uninstall": true,
-    "configAndUnrelatedFileRetained": true,
-    "defaultOpen": "XButton1",
-    "defaultClose": "XButton2",
-    "dailyProcessesAndConfigUnchanged": true
   }
 }

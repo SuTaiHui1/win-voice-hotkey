@@ -1,4 +1,4 @@
-﻿#Include PanelWindowTracker.ahk
+#Include PanelWindowTracker.ahk
 global CloseActionSink := 0, CloseAcceptanceLog := ""
 global BrokerRequestSink := 0
 global PendingBrokerGeneration := 0
@@ -46,6 +46,7 @@ StartCloseBroker() {
 PollCloseBrokerReady(*) {
     global CloseBrokerHandle, CloseBrokerReadyPath, CloseBrokerHWND, CloseBrokerPID
     global CloseBrokerReady, CloseBrokerToken, CloseBrokerStarted, CloseLastResult
+    global RuntimeState
     if FileExist(CloseBrokerReadyPath) {
         try {
             json := FileRead(CloseBrokerReadyPath, "UTF-8")
@@ -55,16 +56,21 @@ PollCloseBrokerReady(*) {
             DllCall("GetWindowThreadProcessId", "Ptr", h[1], "UInt*", &owner)
             if owner != CloseBrokerPID || t[1] != CloseBrokerToken
                 return
-            CloseBrokerHWND := h[1] + 0, CloseBrokerReady := true
-            try FileDelete(CloseBrokerReadyPath)
-            SetTimer(PollCloseBrokerReady, 0)
-            SetTimer(WatchCloseWorker, 200)
-            try WriteCloseStatus()
-        }
+        } catch
+            return
+        CloseBrokerHWND := h[1] + 0, CloseBrokerReady := true
+        try FileDelete(CloseBrokerReadyPath)
+        SetTimer(PollCloseBrokerReady, 0)
+        SetTimer(WatchCloseWorker, 200)
+        ; Persistence errors must reach the runtime error handler, not the JSON catch.
+        WriteCloseStatus()
+        if IsObject(RuntimeState)
+            RuntimeState.Event("broker_ready")
     }
     if !CloseBrokerReady && A_TickCount - CloseBrokerStarted > 4000 {
         CloseLastResult := "helper_start_failed"
         SetTimer(PollCloseBrokerReady, 0)
+        throw Error("Close broker did not become ready within four seconds.")
     }
 }
 StartCloseWorker(mode := "close") {
@@ -81,7 +87,7 @@ StartCloseWorker(mode := "close") {
         return false
     if !CloseBrokerReady {
         CloseLastResult := "helper_not_ready"
-        try WriteCloseStatus()
+        WriteCloseStatus()
         return false
     }
     if !RefreshPanelCandidates() || PanelCandidateOverflow {
@@ -107,7 +113,7 @@ StartCloseWorker(mode := "close") {
     if !okay || result != 1 {
         CloseBusy := false
         CloseLastResult := result = 2 ? "helper_busy" : "helper_not_ready"
-        try WriteCloseStatus()
+        WriteCloseStatus()
         return false
     }
     return true
@@ -129,7 +135,7 @@ CloseBrokerResult(packed, token, *) {
                 FileAppend(json "`n", CloseAcceptanceLog, "UTF-8-RAW")
         }
     }
-    try WriteCloseStatus()
+    WriteCloseStatus()
     if IsObject(InputState) && InputState.Generation = PendingBrokerGeneration
         PanelActionCompleted(PendingBrokerAction, CloseLastResult)
     else
@@ -142,7 +148,7 @@ WatchCloseWorker(*) {
         CloseLastResult := "helper_not_ready"
         SetTimer(WatchCloseWorker, 0)
         ActionState.Cancel()
-        try WriteCloseStatus()
+        WriteCloseStatus()
     } else if CloseBusy && A_TickCount - CloseStartedTick > 2500 {
         CloseBusy := false
         CloseLastResult := "helper_timeout_no_other_action"
@@ -167,14 +173,10 @@ StopCloseWorker(*) {
         try FileDelete(CloseBrokerReadyPath)
 }
 WriteCloseStatus() {
-    global DataDir
+    global RuntimeState
     global CloseKey, CloseLastResult, CloseLastRequested, CloseLatencyMs
     global CloseBrokerPID, CloseBrokerReady
-    path := DataDir "\mapping-state.ini"
-    IniWrite(CloseKey, path, "State", "CloseKey")
-    IniWrite(CloseLastResult, path, "State", "CloseResult")
-    IniWrite(CloseLastRequested, path, "State", "CloseRequestedUTC")
-    IniWrite(CloseLatencyMs, path, "State", "CloseLatencyMs")
-    IniWrite(CloseBrokerPID, path, "State", "CloseBrokerPID")
-    IniWrite(CloseBrokerReady ? 1 : 0, path, "State", "CloseBrokerReady")
+    if IsObject(RuntimeState)
+        RuntimeState.Update(Map("CloseKey",CloseKey,"CloseResult",CloseLastResult,"CloseRequestedUTC",CloseLastRequested,
+            "CloseLatencyMs",CloseLatencyMs,"CloseBrokerPID",CloseBrokerPID,"CloseBrokerReady",CloseBrokerReady ? 1 : 0))
 }

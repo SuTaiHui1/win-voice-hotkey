@@ -6,7 +6,7 @@
 
 out 已存在时构建拒绝覆盖。先保留旧资产，再仅处理确认过的生成目录。安装程序嵌入同次便携 ZIP；输出 setup.exe、portable.zip、source.zip、SHA256SUMS.txt。源码包只选源码、脚本、测试、文档、声明等清单，不含 .git、依赖缓存、out、个人配置或运行日志。
 
-版本字符串位于 Build.ps1、WinHGate.ahk 和 Installer.cs；发布前同步更新 README、CHANGELOG、RELEASE_NOTES 与工作流标签保护。不要覆盖旧标签或 Release 资产。
+版本字符串位于 Build.ps1、RuntimeState.ahk 和 Installer.cs；发布前同步更新 README、CHANGELOG、RELEASE_NOTES 与工作流标签保护。不要覆盖旧标签或 Release 资产。
 
 GitHub Actions 对主分支和标签构建、扫描并测试。标签发布步骤使用仓库现有 GITHUB_TOKEN 的 contents:write，只发布本次版本且拒绝已存在 Release；不创建长期凭据。
 
@@ -14,4 +14,4 @@ GitHub Actions 对主分支和标签构建、扫描并测试。标签发布步�
 
 纯检查在专用不可见测试桌面运行，不切换用户屏幕。完整正常模式输入钩子/安装门禁回归受隔离环境账号保护；不要在日常主机绕过条件或为了测试启用系统功能。默认发布工作只跑 -UnitOnly。
 
-静默安装检查使用 --silent --isolated --target <专用空目录>，跳过真实开始菜单和自启写入；测试可用进程级 WIN_VOICE_HOTKEY_DATA_DIR 指向专用测试数据目录。--smoke-test 禁用钩子且使用隔离自启位置，仍会创建应用自身设置窗口与代理。已知状态陈旧边界和升级前退出注意事项见 README 与 TESTING.md。
+静默安装检查使用 --silent --isolated --target <专用空目录>，跳过真实开始菜单和自启写入；测试可用进程级 WIN_VOICE_HOTKEY_DATA_DIR 指向专用测试数据目录。--smoke-test 禁用钩子且使用隔离自启位置，仍会创建应用自身设置窗口与代理。文件视图核对和升级前退出注意事项见 README 与 TESTING.md。

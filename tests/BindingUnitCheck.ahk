@@ -2,6 +2,7 @@
 #Warn All, StdOut
 #Warn LocalSameAsGlobal, Off
 OnError(Failed)
+#Include RuntimeState.ahk
 #Include KeyCatalog.ahk
 #Include SupportDiagnostics.ahk
 #Include InputRouter.ahk

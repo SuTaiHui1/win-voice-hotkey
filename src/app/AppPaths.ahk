@@ -12,8 +12,11 @@ if !SmokeTest {
     ApplicationMutex := DllCall("CreateMutexW", "Ptr", 0, "Int", false, "WStr", "Local\WinVoiceHotkey.App", "Ptr")
     if !ApplicationMutex || A_LastError = 183
         ExitApp()
-    OnExit(ReleaseApplicationMutex)
 }
+; One exit callback owns cleanup and releases the mutex only after publishing stop.
+OnExit(MappingExited)
+InitializeRuntimeState()
+OnMessage(0x805E, AppExitRequest)
 global StartupLink := (SmokeTest ? DataDir "\startup-test" : A_Startup) "\WinVoiceHotkey.lnk"
 global LauncherPath := A_ScriptDir "\..\WinVoiceHotkey.exe"
 

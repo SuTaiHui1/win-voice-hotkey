@@ -1,6 +1,6 @@
 # 发布来源与边界
 
-运行入口 WinHGate.ahk 使用 AppPaths、KeyCatalog、SupportDiagnostics、InputRouter、KeyboardObserver（含 MouseObserver）、KeySettings（含 CloseBindings）、GlobalRuntime 与 CloseBrokerRuntime（含 PanelWindowTracker）。C# 代理由 VoicePanelCore/VoicePanelBroker 构建，宿主为 Launcher/Installer。保留的测试 fixture 不进入正常应用入口。
+运行入口 WinHGate.ahk 使用 RuntimeState、AppPaths、KeyCatalog、SupportDiagnostics、InputRouter、KeyboardObserver（含 MouseObserver）、KeySettings（含 CloseBindings）、GlobalRuntime 与 CloseBrokerRuntime（含 PanelWindowTracker）。C# 代理由 VoicePanelCore/VoicePanelBroker 构建，宿主为 Launcher/Installer。保留的测试 fixture 不进入正常应用入口。
 
 项目来自所有者的本地 Win+H 原型，不包含 CapsWriter ASR 模型、Python 客户端/服务器、旧焦点适配器或第三方 UIA-v2 代码。项目所有者已授权项目专用代码采用原仓库 MIT 许可；没有把这一授权扩展到第三方解释器。
 
@@ -8,4 +8,4 @@ AutoHotkey 2.0.30 未修改，固定运行时摘要、完整许可和对应上�
 
 公开仓库按源码、脚本、测试、文档和声明清单组装，不复制日常安装目录或整个工作目录。排除真实配置、状态、日志、备份、录音、凭据、本机路径及个人报告。测试公开结果只含脱敏计数和布尔摘要。默认不保存触发历史；支持诊断需显式启用且不自动上传。
 
-0.1.2 汇总已经使用的本地修复及设置更新，仅改公开版本元数据和文档，不借发布新增系统设置或更改日常个人绑定。检查脚本与人工审查互相补充，不把模式扫描当作安全认证。
+0.1.3 汇总已经使用的本地修复、状态持久化及生命周期核验，仅改公开版本元数据和文档，不借发布新增系统设置或更改日常个人绑定。检查脚本与人工审查互相补充，不把模式扫描当作安全认证。

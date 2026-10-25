@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$SetupExe,
     [Parameter(Mandatory=$true)][string]$OldAppPathsFixture,
@@ -30,14 +30,14 @@ function Run($file,$arguments,$label,[bool]$capture=$true){
     }finally{$p.Dispose()}
 }
 function State($path){$s=@{};if(Test-Path -LiteralPath $path){foreach($line in [IO.File]::ReadAllLines($path)){if($line -match '^([^=\[]+)=(.*)$'){$s[$Matches[1]]=$Matches[2]}}};return $s}
-function Alive($s){return @(Get-Process -Id ([int]$s['PID']),([int]$s['CloseBrokerPID']) -ErrorAction SilentlyContinue).Count}
+function Alive($s){return @(Get-Process -Id @(@([int]$s['PID'],[int]$s['CloseBrokerPID'])|Where-Object {$_ -gt 0}) -ErrorAction SilentlyContinue).Count}
 function StartInstance($launcher,$profile,$label){
     $r=Run $launcher '' ($label+' launch') $false
     Assert ($label+' launcher success') ($r.ExitCode -eq 0) $r
     $path=Join-Path $profile 'mapping-state.ini';$deadline=[DateTime]::UtcNow.AddSeconds(8)
-    do{$s=State $path;if($s['Running'] -eq '1' -and $s['CloseBrokerReady'] -eq '1'){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $deadline)
+    do{$s=State $path;if($s['Running'] -eq '1' -and ($s['CloseBrokerReady'] -eq '1' -or ($s['BrokerMode'] -eq 'on_demand' -and $s['BrokerLifecycleReady'] -eq '1'))){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $deadline)
     $p=if($s['PID']){Get-CimInstance Win32_Process -Filter ('ProcessId='+$s['PID'])}else{$null}
-    Assert ($label+' runtime ready') ($s['Running'] -eq '1' -and $s['CloseBrokerReady'] -eq '1' -and $p -and $p.ExecutablePath.StartsWith($testRoot+'\',[StringComparison]::OrdinalIgnoreCase)) $s
+    Assert ($label+' runtime ready') ($s['Running'] -eq '1' -and ($s['CloseBrokerReady'] -eq '1' -or ($s['BrokerMode'] -eq 'on_demand' -and $s['BrokerLifecycleReady'] -eq '1')) -and $p -and $p.ExecutablePath.StartsWith($testRoot+'\',[StringComparison]::OrdinalIgnoreCase)) $s
     return $s
 }
 function Snapshot($folder){
@@ -123,7 +123,7 @@ try{
     $complete=$true
 }catch{$failure=$_.Exception.Message;($_|Out-String)|Set-Content -Encoding utf8 -LiteralPath (Join-Path $resultsDir 'failure.txt')}
 finally{
-    if($current){foreach($id in @([int]$current['PID'],[int]$current['CloseBrokerPID'])){$p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$id);if($p){if(!$p.ExecutablePath.StartsWith($testRoot+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Cleanup target outside this test root.'};Stop-Process -Id $id -Force}}}
+    if($current){foreach($id in @(@([int]$current['PID'],[int]$current['CloseBrokerPID'])|Where-Object {$_ -gt 0})){$p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$id);if($p){if(!$p.ExecutablePath.StartsWith($testRoot+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Cleanup target outside this test root.'};Stop-Process -Id $id -Force}}}
     $env:WIN_VOICE_HOTKEY_DATA_DIR=$oldData
     @{Kind='InstallerStopOutcomeMatrix';Complete=$complete;Failure=$failure;TestRoot=$testRoot;MicrophoneUsed=$false;InputSent=$false;Observations=@($records.ToArray())}|ConvertTo-Json -Depth 10|Set-Content -Encoding utf8 -LiteralPath $ResultsPath
 }

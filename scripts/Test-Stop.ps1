@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$PackageRoot,
     [Parameter(Mandatory=$true)][string]$SetupExe,
@@ -38,11 +38,11 @@ function StartInstance($launcher,$label){
     $start=Run $launcher '' ($label+' launch') $false
     Assert ($label+' launcher success') ($start.ExitCode -eq 0) $start
     $deadline=[DateTime]::UtcNow.AddSeconds(10)
-    do{$s=State;$process=if($s.ContainsKey('PID')){Get-CimInstance Win32_Process -Filter ('ProcessId='+$s['PID'])}else{$null};if($s['Running'] -eq '1' -and $s['CloseBrokerReady'] -eq '1' -and $process -and $process.ExecutablePath.StartsWith($testRoot+'\',[StringComparison]::OrdinalIgnoreCase)){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $deadline)
-    Assert ($label+' runtime and broker ready') ($s['Running'] -eq '1' -and $s['CloseBrokerReady'] -eq '1' -and $process -and $process.ExecutablePath.StartsWith($testRoot+'\',[StringComparison]::OrdinalIgnoreCase)) $s
+    do{$s=State;$process=if($s.ContainsKey('PID')){Get-CimInstance Win32_Process -Filter ('ProcessId='+$s['PID'])}else{$null};if($s['Running'] -eq '1' -and ($s['CloseBrokerReady'] -eq '1' -or ($s['BrokerMode'] -eq 'on_demand' -and $s['BrokerLifecycleReady'] -eq '1')) -and $process -and $process.ExecutablePath.StartsWith($testRoot+'\',[StringComparison]::OrdinalIgnoreCase)){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $deadline)
+    Assert ($label+' runtime ready (resident or on-demand standby)') ($s['Running'] -eq '1' -and ($s['CloseBrokerReady'] -eq '1' -or ($s['BrokerMode'] -eq 'on_demand' -and $s['BrokerLifecycleReady'] -eq '1')) -and $process -and $process.ExecutablePath.StartsWith($testRoot+'\',[StringComparison]::OrdinalIgnoreCase)) $s
     return $s
 }
-function Remaining($s){return @(Get-Process -Id ([int]$s['PID']),([int]$s['CloseBrokerPID']) -ErrorAction SilentlyContinue|Select-Object ProcessName,Id)}
+function Remaining($s){return @(Get-Process -Id @(@([int]$s['PID'],[int]$s['CloseBrokerPID'])|Where-Object {$_ -gt 0}) -ErrorAction SilentlyContinue|Select-Object ProcessName,Id)}
 function Exited($s,$label){
     $deadline=[DateTime]::UtcNow.AddSeconds(5)
     do{$left=Remaining $s;if($left.Count -eq 0){break};Start-Sleep -Milliseconds 50}while([DateTime]::UtcNow -lt $deadline)
@@ -127,7 +127,7 @@ try{
     $complete=$true
 }catch{$failure=$_.Exception.Message;$_|Out-String|Set-Content (Join-Path $resultsDir 'failure.txt') -Encoding UTF8}
 finally{
-    if($current){foreach($id in @([int]$current['PID'],[int]$current['CloseBrokerPID'])){$p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$id);if($p){if(-not $p.ExecutablePath.StartsWith($testRoot+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Cleanup target outside this test root'};Stop-Process -Id $id -Force;Record 'failed-test process cleanup' @{PID=$id;Path=$p.ExecutablePath}}}}
+    if($current){foreach($id in @(@([int]$current['PID'],[int]$current['CloseBrokerPID'])|Where-Object {$_ -gt 0})){$p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$id);if($p){if(-not $p.ExecutablePath.StartsWith($testRoot+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Cleanup target outside this test root'};Stop-Process -Id $id -Force;Record 'failed-test process cleanup' @{PID=$id;Path=$p.ExecutablePath}}}}
     $env:WIN_VOICE_HOTKEY_DATA_DIR=$oldData;$env:WIN_VOICE_HOTKEY_DIAG_LOG=$oldDiag
     [ordered]@{Kind='LocalStopFixNormalModeRegression';Complete=$complete;Failure=$failure;Guest=$env:COMPUTERNAME;Identity=[Security.Principal.WindowsIdentity]::GetCurrent().Name;FinishedUtc=[DateTime]::UtcNow.ToString('o');TestRoot=$testRoot;PackageRoot=$PackageRoot;SetupExe=$SetupExe;MicrophoneUsed=$false;InputSent=$false;Observations=$records}|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $ResultsPath -Encoding UTF8
 }

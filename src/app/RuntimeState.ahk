@@ -1,4 +1,4 @@
-; Runtime snapshots deliberately use file I/O, never the legacy Windows profile API.
+﻿; Runtime snapshots deliberately use file I/O, never the legacy Windows profile API.
 global RuntimeState := 0
 
 class RuntimeStateStore {
@@ -6,7 +6,7 @@ class RuntimeStateStore {
         this.Folder := folder, this.Path := folder "\mapping-state.ini"
         this.PID := DllCall("GetCurrentProcessId", "UInt"), this.Sequence := 0
         this.Sections := Map("State", Map("Running",0,"Ready",0,"Phase","starting","PID",this.PID,
-            "HWND",hwnd,"InstanceToken",token,"Version","0.1.3","CandidateBuild","v0.1.3",
+            "HWND",hwnd,"InstanceToken",token,"Version","0.1.4","CandidateBuild","release-0.1.4",
             "StateRevision","atomic-v1","StartedUTC",A_NowUTC,"MainReady",0,"CloseBrokerReady",0,"CloseBrokerPID",0), "Tray", Map())
         this.Failed := false, this.Stopped := false, this.Stopping := false
     }
@@ -33,7 +33,7 @@ class RuntimeStateStore {
         try {
             state := this.Sections["State"]
             state["PID"] := this.PID, state["UpdatedUTC"] := A_NowUTC, state["Sequence"] := ++this.Sequence
-            state["Running"] := !this.Failed && !this.Stopped && !this.Stopping && state["MainReady"] && state["CloseBrokerReady"] ? 1 : 0
+            state["Running"] := !this.Failed && !this.Stopped && !this.Stopping && state["MainReady"] && (state["CloseBrokerReady"] || (state.Get("BrokerMode","") = "on_demand" && state.Get("BrokerLifecycleReady",0))) ? 1 : 0
             state["Ready"] := state["Running"]
             state["Phase"] := this.Failed ? "failed" : this.Stopped ? "stopped" : this.Stopping ? "stopping" : state["Ready"] ? "ready" : "starting"
             text := this.Text()

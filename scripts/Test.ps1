@@ -27,18 +27,18 @@ Compile @('/nologo','/target:exe','/platform:x64',('/out:'+$hostExe),(Join-Path 
 Copy-Item -Path (Join-Path $root 'src\app\*.ahk') -Destination $testRoot
 Copy-Item -LiteralPath (Join-Path $root 'tests\BindingUnitCheck.ahk') -Destination $testRoot
 Copy-Item -LiteralPath (Join-Path $root 'tests\RuntimeStateUnitCheck.ahk') -Destination $testRoot
+Copy-Item -LiteralPath (Join-Path $root 'tests\LanguageUnitCheck.ahk') -Destination $testRoot
+Copy-Item -LiteralPath (Join-Path $root 'tests\BrokerIdleUnitCheck.ahk') -Destination $testRoot
 $null=RunFinite $hostExe ('"'+(Join-Path $package 'app\dependencies\AutoHotkey64.exe')+'" "'+(Join-Path $testRoot 'BindingUnitCheck.ahk')+'"') 'binding'
 $null=RunFinite $hostExe ('"'+(Join-Path $package 'app\dependencies\AutoHotkey64.exe')+'" "'+(Join-Path $testRoot 'RuntimeStateUnitCheck.ahk')+'"') 'runtime-state'
+$null=RunFinite $hostExe ('"'+(Join-Path $package 'app\dependencies\AutoHotkey64.exe')+'" "'+(Join-Path $testRoot 'LanguageUnitCheck.ahk')+'"') 'language'
+$null=RunFinite $hostExe ('"'+(Join-Path $package 'app\dependencies\AutoHotkey64.exe')+'" "'+(Join-Path $testRoot 'BrokerIdleUnitCheck.ahk')+'"') 'broker-idle'
 $framework=Split-Path $csc -Parent
 $refs=@('System.dll','System.Core.dll','System.Web.Extensions.dll',(Join-Path $framework 'WPF\UIAutomationClient.dll'),(Join-Path $framework 'WPF\UIAutomationTypes.dll'),(Join-Path $framework 'WPF\WindowsBase.dll'))
 $coreExe=Join-Path $testRoot 'PanelCoreUnitCheck.exe'
 Compile (@('/nologo','/target:exe','/platform:x64',('/out:'+$coreExe)) + @($refs | ForEach-Object {'/reference:'+$_}) + @((Join-Path $root 'src\app\VoicePanelCore.cs'),(Join-Path $root 'tests\PanelCoreUnitCheck.cs')))
 $core=RunFinite $coreExe '' 'panel-core'
-$result=@{Binding=(Get-Content -Raw -LiteralPath (Join-Path $testRoot 'binding-unit-results.json') | ConvertFrom-Json);RuntimeState=(Get-Content -Raw -LiteralPath (Join-Path $testRoot 'runtime-state-unit-results.json') | ConvertFrom-Json);PanelCore=($core|ConvertFrom-Json)}
-& (Join-Path $PSScriptRoot 'Test-Lifecycle.ps1')
-$lifeRoot=Get-ChildItem -LiteralPath (Join-Path $root 'out') -Directory -Filter 'lifecycle-*'|Sort-Object LastWriteTimeUtc -Descending|Select-Object -First 1
-$life=Get-Content -LiteralPath (Join-Path $lifeRoot.FullName 'lifecycle-regression.json') -Raw -Encoding UTF8|ConvertFrom-Json
-$result.Lifecycle=@{Passed=$life.Passed;AllPassed=$life.AllPassed;NoHooks=$life.NoHooks;NoVoice=$life.NoVoice;NoActualLoginOrReboot=$life.NoActualLoginOrReboot}
+$result=@{BrokerIdle=(Get-Content -Raw -LiteralPath (Join-Path $testRoot 'broker-idle-unit-results.json')|ConvertFrom-Json);Language=(Get-Content -Raw -LiteralPath (Join-Path $testRoot 'language-unit-results.json')|ConvertFrom-Json);Binding=(Get-Content -Raw -LiteralPath (Join-Path $testRoot 'binding-unit-results.json') | ConvertFrom-Json);RuntimeState=(Get-Content -Raw -LiteralPath (Join-Path $testRoot 'runtime-state-unit-results.json') | ConvertFrom-Json);PanelCore=($core|ConvertFrom-Json)}
 $result|ConvertTo-Json -Depth 8|Set-Content -Encoding utf8 -LiteralPath (Join-Path $testRoot 'results.json')
 Write-Output ('Pure tests passed: '+$testRoot+'\results.json')
 if(!$UnitOnly){

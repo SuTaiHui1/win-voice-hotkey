@@ -1,5 +1,6 @@
+#Include DictationLanguageRuntime.ahk
 ; Actions are queued outside low-level hooks. Shared bindings query actual panel state.
-global VoiceDispatchSink := 0, BoundActionNotificationSink := 0
+global VoiceDispatchSink := 0, BoundActionNotificationSink := 0, PendingVoiceTarget := 0
 global InputState := 0, RecoveryPaused := false, RecoveryWaiting := false
 global ActionState := PanelActionState(), PendingBrokerAction := "close"
 
@@ -55,36 +56,41 @@ QueueBoundAction(role, generation) {
         DllCall("PostMessageW", "Ptr", A_ScriptHwnd, "UInt", 0x8060, "Ptr", role, "Ptr", generation)
 }
 OnBoundAction(role, generation, *) {
-    global SettingsOpen, RecoveryPaused, InputState
+    global SettingsOpen, RecoveryPaused, InputState, DictationLanguageIO
     if SettingsOpen || RecoveryPaused || !IsObject(InputState) || generation != InputState.Generation
         return
-    SetTimer((*) => DispatchBoundAction(role, generation), -15)
+    target := DictationLanguageIO.Capture()
+    SetTimer((*) => DispatchBoundAction(role, generation, target), -15)
 }
-DispatchBoundAction(role, generation) {
-    global SettingsOpen, RecoveryPaused, InputState, ActionState
+DispatchBoundAction(role, generation, target := unset) {
+    global SettingsOpen, RecoveryPaused, InputState, ActionState, ChineseLanguageGate, DictationLanguageIO, PendingVoiceTarget
     if SettingsOpen || RecoveryPaused || generation != InputState.Generation || ModifiersHeld()
         return
+    if IsObject(ChineseLanguageGate.Pending) {
+        if role = 2 || role = 3
+            FailChineseDictation("cancelled")
+        return
+    }
+    if (role = 2 || role = 3) && CancelQueuedBrokerOpen()
+        return
     mode := ActionState.Begin(role, A_TickCount)
+    if mode != ""
+        PendingVoiceTarget := IsSet(target) ? target : DictationLanguageIO.Capture()
     if mode = "open"
-        DispatchVoiceRequest()
+        DispatchVoiceRequest(PendingVoiceTarget)
     else if mode != "" && !StartCloseWorker(mode)
         ActionState.Cancel()
 }
-DispatchVoiceRequest() {
-    global VoiceDispatchSink
-    if IsObject(VoiceDispatchSink) {
-        VoiceDispatchSink.Call()
-        return
-    }
-    Send("#h")
+DispatchVoiceRequest(target := unset) {
+    return IsSet(target) ? BeginChineseDictation(target) : BeginChineseDictation()
 }
 PanelActionCompleted(mode, status) {
-    global ActionState, SettingsOpen, RecoveryPaused
+    global ActionState, SettingsOpen, RecoveryPaused, PendingVoiceTarget
+    target := PendingVoiceTarget, PendingVoiceTarget := 0
     SupportLog("panel_result", "mode=" mode " status=" status)
     next := ActionState.Finish(mode, status, A_TickCount)
     if next = "open" && !SettingsOpen && !RecoveryPaused {
-        DispatchVoiceRequest()
-        SetTimer(PollOpeningPanel, 250)
+        DispatchVoiceRequest(target)
     }
     if !ActionState.PollNeeded(A_TickCount)
         SetTimer(PollOpeningPanel, 0)
@@ -125,6 +131,7 @@ WaitRecoveryRelease(*) {
     OpenKeySettings()
 }
 StopActionTimers(*) {
+    StopChineseDictation()
     SetTimer(PollOpeningPanel, 0)
     SetTimer(WaitRecoveryRelease, 0)
 }

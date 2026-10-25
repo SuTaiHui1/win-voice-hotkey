@@ -196,16 +196,28 @@ RecordHeldVK := 1, RecordHeldSC := 0, RecordHeldMouse := true, RecordHeldNative 
 Check(ObserveRecording(1,0,false,false,true,false) && !RecordHeldVK, "cancel retains consumed mouse release pairing")
 RecordHeldVK := 0xA4, RecordHeldSC := 0x38, RecordHeldMouse := false, RecordHeldNative := true
 Check(!ObserveRecording(0xA4,0x38,false,false,false,false) && !RecordHeldVK, "recorded modifier release remains native")
+class BindingLanguageIO {
+ Capture() => {Window:1,Focus:2,Thread:3,PID:4,HKL:0x08040804}
+ Layouts() => [0x08040804]
+ Now() => A_TickCount
+ Request(*) => false
+ Schedule(*) {
+ }
+}
+savedLanguageIO := DictationLanguageIO
+DictationLanguageIO := BindingLanguageIO()
 VoiceDispatchSink := CountTrialOpen
 for enabled in [false,true] {
     SupportDiagnostics := enabled
     ActionState := PanelActionState()
     beforeOpen := TrialOpenCount
+    PendingVoiceTarget := DictationLanguageIO.Capture()
     PanelActionCompleted("toggle","panel_absent")
     StopActionTimers()
     Check(TrialOpenCount = beforeOpen + 1, "normal open remains enabled with support logging on or off")
 }
 SupportDiagnostics := false, VoiceDispatchSink := 0
+DictationLanguageIO := savedLanguageIO
 TestLiveFrames := Map(101,{PID:1,ThreadID:2,StartFileTime:3})
 PanelCandidates := Map(101,{PID:9,ThreadID:9,StartFileTime:9})
 Check(RefreshPanelCandidates(RecheckTestFrame,DiscoverTestFrames) && PanelCandidates.Has(101), "WinEvent child frame survives a top-level enumeration miss")

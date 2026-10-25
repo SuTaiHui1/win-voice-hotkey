@@ -1,32 +1,67 @@
 {
-  "version": "0.1.3",
-  "date": "2026-10-20",
+  "version": "0.1.4",
+  "date": "2026-10-25",
   "currentSource": {
-    "voiceOrMicrophoneOrRealUIAUsed": false,
-    "lifecycle": 13,
-    "productionConfigurationChanged": false,
-    "panelCore": 8,
     "binding": 1539,
-    "runtimeState": 21
+    "languageAndSilentResults": 60,
+    "runtimeState": 24,
+    "brokerIdleLease": 27,
+    "panelCore": 8,
+    "brokerLifecycle": 26,
+    "queuedImmediateRepliesWithinLifecycle": 30,
+    "launcherLifecycle": 13,
+    "voiceOrMicrophoneOrRealPanelInvokeUsed": false,
+    "isolation": "Dedicated invisible desktop for pure tests; independent no-input fixtures and profiles for lifecycle and packages"
   },
-  "naturalLogin": {
-    "brokerReady": true,
-    "singleWindows11x64Machine": true,
-    "newLifecycleRecordsVerified": true,
-    "actualProcessAndSnapshotMatched": true,
-    "allDevicesOrLongTermReliabilityValidated": false,
-    "completeKernelRestart": true,
-    "priorStaleStateReport": "Corrected: inspection context read a packaged-app private cache copy; actual host files contained current state."
+  "packages": {
+    "installedSmoke": true,
+    "portableSmoke": true,
+    "isolatedInstallUpgradeUninstall": true,
+    "configurationAndUnrelatedFileRetention": true,
+    "usesPersonalConfiguration": false
   },
   "publication": {
-    "dailyInstanceRestartedForRelease": false,
-    "versionMetadataUpdated": true,
-    "sameBusinessLogicAsValidatedDailyBuild": true
+    "sameFunctionalSourceAsVerifiedDailyBuild": true,
+    "releaseOnlyMetadata": "Version/build label and installation marker",
+    "deferredQueuedReplyFix": "Dispatch next queued request after returning from prior reply callback; covered by 30 rapid reply cycles",
+    "dailyConfigurationAndAutostartPreserved": true,
+    "githubAssetsExcludePrivateEvidence": true
   },
-  "settingsFinalVisualAcceptance": false,
-  "historicalRegression": {
-    "stopAndLifecycle": 32,
-    "installerStopGate": 93,
-    "rerunThisRelease": false
-  }
+  "singleMachineResourceSample": {
+    "date": "2026-10-25",
+    "windows": "Windows 11 x64",
+    "logicalProcessors": 16,
+    "roughSampleSeconds": 30,
+    "MBBytes": 1000000,
+    "beforeIdleWorkingSetMB": 67.739648,
+    "afterIdleWorkingSetMB": 17.063936,
+    "beforeIdlePrivateCommittedMB": 27.787264,
+    "afterIdlePrivateCommittedMB": 3.85024,
+    "beforeIdleAverageWholeMachineCPUPercent": 0.0611826,
+    "afterIdleAverageWholeMachineCPUPercent": 0.0225096,
+    "firstBrokerReadyMs": 251,
+    "hotPresenceQueryMs": 15,
+    "firstBrokerReadyIsNotPanelVisibleLatency": true,
+    "activeNoInputFixtureWorkingSetMB": 67.342336,
+    "includesWindowsSpeechServices": false,
+    "realRecordingOrRecognitionLoadMeasured": false,
+    "crossDeviceGuarantee": false,
+    "resourceSamplesPrecedeFinalDeferredReplyFix": true
+  },
+  "notValidated": {
+    "currentPhysicalSideButtonToPanelToChineseTranscriptionUserAcceptance": false,
+    "realSpeechOrMicrophoneThisRound": false,
+    "newNaturalLoginOrSystemRebootThisRound": false,
+    "allDevicesWindowsBuildsInputsDPIAndLongTermReliability": false,
+    "settingsFinalVisualAcceptance": false,
+    "sandboxHookRegressionRerun": false
+  },
+  "historicalNativeLanguageFixture": {
+    "checks": 11,
+    "realWindowsLanguageSwitchInIndependentTextbox": true,
+    "WinHReplacedByTestCallback": true,
+    "rerunOnFormalReleasePackage": false,
+    "fullListeningAcceptance": false
+  },
+  "unsigned": true
 }

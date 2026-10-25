@@ -1,4 +1,4 @@
-﻿#Requires AutoHotkey v2.0
+#Requires AutoHotkey v2.0
 #Include RuntimeState.ahk
 #Include KeyCatalog.ahk
 ; A read-only status viewer must not acquire the application's single-instance mutex.
@@ -39,5 +39,12 @@ statusLabels["helper_not_ready"] := "关闭键暂不可用，可退出后重新�
 statusLabels["helper_start_failed"] := "关闭键启动失败，打开键仍可使用"
 statusLabels["helper_busy"] := "正在处理关闭操作"
 closeDescription := statusLabels.Has(closeResult) ? statusLabels[closeResult] : "关闭检查未完成，未操作其他窗口"
-MsgBox(message "`n唤起键：" key "`n关闭键：" closeLabel "`n关闭结果：" closeDescription "`n关闭键无面板时不操作，不执行前进/后退。`n右键托盘图标选择退出可解除映射。", "语音输入状态")
+languageLabels := Map("not_requested","尚未执行","switching","正在确认简体中文","ready","已确认简体中文",
+ "missing_chinese","未找到简体中文输入法","no_target","未确认目标输入窗口","focus_changed","焦点已改变，本次取消",
+ "user_language_changed","用户改变语言，本次取消","switch_request_failed","目标窗口未接受语言请求",
+ "switch_timeout","切换未确认，本次未启动","cancelled","已取消")
+languageResult := values.Get("LanguageResult","not_requested")
+languageDescription := "上次唤醒语言检查：" (languageLabels.Has(languageResult) ? languageLabels[languageResult] : languageResult)
+ . "`n唤醒前确认简体中文；关闭后保留中文，不自动恢复语言。"
+MsgBox(languageDescription "`n" message "`n唤起键：" key "`n关闭键：" closeLabel "`n关闭结果：" closeDescription "`n关闭键无面板时不操作，不执行前进/后退。`n右键托盘图标选择退出可解除映射。", "语音输入状态")
 ExitApp()

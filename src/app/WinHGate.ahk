@@ -1,4 +1,4 @@
-﻿#Requires AutoHotkey v2.0
+#Requires AutoHotkey v2.0
 #SingleInstance Ignore
 #MaxThreadsPerHotkey 1
 #Warn All, StdOut
@@ -42,9 +42,7 @@ LoadCloseBinding()
 try StartPanelWindowTracker()
 catch
     CloseLastResult := "tracker_unavailable"
-StartCloseBroker()
-if !CloseBrokerHandle
-    throw Error("Close broker could not be started.")
+InitializeCloseBrokerMode()
 
 KeyHistory(0)
 global Snapshot := 0, SnapshotTick := 0, Held := false
@@ -93,7 +91,7 @@ for argument in A_Args
 
 WriteMappingStatus(running) {
     global RuntimeState, TriggerKey, SmokeTest
-    RuntimeState.Update(Map("MainReady",running ? 1 : 0,"Key",TriggerKey,"Mode",SmokeTest ? "smoke_no_voice" : "global_voice_mapping"), false)
+    RuntimeState.Update(Map("MainReady",running ? 1 : 0,"Key",TriggerKey,"Mode",SmokeTest ? "smoke_no_voice" : "global_voice_mapping","DictationLanguage","zh-CN","LanguageResult","not_requested","LanguageRestore","manual"), false)
     WriteCloseStatus()
 }
 

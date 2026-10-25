@@ -73,7 +73,7 @@ internal static class Installer {
             }
         }
         File.Delete(Path.Combine(folder,"portable.flag"));
-        File.WriteAllText(Path.Combine(folder,Marker),"WinVoiceHotkey 0.1.3\n");
+        File.WriteAllText(Path.Combine(folder,Marker),"WinVoiceHotkey 0.1.4\n");
         File.Copy(Assembly.GetExecutingAssembly().Location,Path.Combine(folder,"Uninstall.exe"),upgrade);
         installed.Add("Uninstall.exe");installed.Add(Marker);
         File.WriteAllLines(Path.Combine(folder,"install-files.txt"),installed.ToArray());

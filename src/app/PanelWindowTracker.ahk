@@ -1,4 +1,4 @@
-﻿; Window metadata only. No input text, microphone access or coordinate clicks.
+; Window metadata only. No input text, microphone access or coordinate clicks.
 global PanelEventHook := 0, PanelEventCallback := 0, PanelCandidates := Map()
 global PanelEventTotal := 0, PanelLastObservedHWND := 0
 global PanelCandidateOverflow := false
@@ -56,7 +56,7 @@ StartPanelWindowTracker() {
     global PanelEventHook, PanelEventCallback
     if PanelEventHook
         return
-    OnMessage(0x8059, ObservePanelWindowEvent)
+    OnMessage(0x8059, ObserveTrackedPanelEvent)
     PanelEventCallback := CallbackCreate(PanelWindowEventCallback, "Fast", 7)
     PanelEventHook := DllCall("SetWinEventHook", "UInt", 0x8000, "UInt", 0x800B,
         "Ptr", 0, "Ptr", PanelEventCallback, "UInt", 0, "UInt", 0, "UInt", 2, "Ptr")
@@ -162,4 +162,11 @@ PanelCandidateJSON() {
         separator := ","
     }
     return text "]"
+}
+ObserveTrackedPanelEvent(hwnd,event,*) {
+ global PanelCandidates
+ known := PanelCandidates.Has(hwnd)
+ ObservePanelWindowEvent(hwnd,event)
+ if known || PanelCandidates.Has(hwnd)
+  BrokerNativePanelChanged()
 }

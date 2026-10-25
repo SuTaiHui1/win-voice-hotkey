@@ -35,7 +35,7 @@ foreach ($file in 'README.md','CHANGELOG.md','THIRD_PARTY_NOTICES.md','LICENSE')
 }
 Copy-Item -Recurse -LiteralPath (Join-Path $root 'docs') -Destination $package
 New-Item -ItemType File -Path (Join-Path $package 'portable.flag') | Out-Null
-$version = '0.1.3'
+$version = '0.1.4'
 $portable = Join-Path $out "win-voice-hotkey-$version-windows-x64-portable.zip"
 [IO.Compression.ZipFile]::CreateFromDirectory($package,$portable,[IO.Compression.CompressionLevel]::Optimal,$false)
 $installer = Join-Path $out "win-voice-hotkey-$version-windows-x64-setup.exe"

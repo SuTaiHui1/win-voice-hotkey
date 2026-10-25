@@ -69,7 +69,7 @@ internal static class Launcher {
         DateTime until=DateTime.UtcNow.AddSeconds(8);
         do {
             var state=State(data);var instance=Verify(state,root);
-            if(instance!=null&&instance.PID==pid&&Read(state,"Running")=="1"&&Read(state,"Ready")=="1"&&Read(state,"Phase")=="ready"&&Read(state,"CloseBrokerReady")=="1")return 0;
+            if(instance!=null&&instance.PID==pid&&Read(state,"Running")=="1"&&Read(state,"Ready")=="1"&&Read(state,"Phase")=="ready"&&(Read(state,"CloseBrokerReady")=="1"||(Read(state,"BrokerMode")=="on_demand"&&Read(state,"BrokerLifecycleReady")=="1")))return 0;
             if(child!=null&&child.HasExited)return StopError(child.ExitCode==0?2:child.ExitCode,"程序在就绪前退出；请查看 lifecycle.log。 / Runtime exited before verified readiness.");
             if(Read(state,"PID")==pid.ToString()&&Read(state,"Phase")=="failed")return StopError(2,"程序初始化失败；请查看 lifecycle.log。 / Runtime initialization failed.");
             Thread.Sleep(40);

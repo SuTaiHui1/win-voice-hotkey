@@ -1,4 +1,4 @@
-﻿; Runtime state is never written into the source or installation folder.
+; Runtime state is never written into the source or installation folder.
 global DataDir := EnvGet("WIN_VOICE_HOTKEY_DATA_DIR")
 if DataDir = ""
     DataDir := A_AppData "\WinVoiceHotkey"
@@ -47,6 +47,7 @@ AppSettingsRequest(*) {
 RunSmokeTest(*) {
     global DataDir, TriggerKey, CloseKey, ConfigPath, StartupLink, SettingsOpen, SettingsWindow, CloseBrokerReady
     try {
+        StartCloseBroker()
         deadline := A_TickCount + 4000
         while !CloseBrokerReady && A_TickCount < deadline
             Sleep(25)
